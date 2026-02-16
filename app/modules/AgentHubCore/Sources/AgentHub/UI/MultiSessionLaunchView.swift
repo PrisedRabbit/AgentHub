@@ -21,8 +21,6 @@ public struct MultiSessionLaunchView: View {
 
   @AppStorage(AgentHubDefaults.smartModeEnabled) private var smartModeEnabled: Bool = false
 
-  @AppStorage(AgentHubDefaults.smartModeEnabled) private var smartModeEnabled: Bool = false
-
   @Environment(\.colorScheme) private var colorScheme
   @State private var isExpanded = false
   @State private var isDragging = false
