@@ -17,6 +17,7 @@ import UniformTypeIdentifiers
 public struct MultiSessionLaunchView: View {
   @Bindable var viewModel: MultiSessionLaunchViewModel
   var intelligenceViewModel: IntelligenceViewModel?
+  var expandRequestID: Int = 0
 
   @AppStorage(AgentHubDefaults.smartModeEnabled) private var smartModeEnabled: Bool = false
 
@@ -125,6 +126,11 @@ public struct MultiSessionLaunchView: View {
         }
       }
     }
+    .onChange(of: expandRequestID) { _, _ in
+      withAnimation(.easeInOut(duration: 0.2)) {
+        isExpanded = true
+      }
+    }
   }
 
   // MARK: - Header
@@ -207,12 +213,28 @@ public struct MultiSessionLaunchView: View {
   private var repositorySection: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
-        Button(action: { viewModel.selectRepository() }) {
-          HStack(spacing: 6) {
-            Image(systemName: "folder")
-              .font(.system(size: 11))
-            Text(viewModel.selectedRepository?.name ?? "Select repository")
-              .font(.system(size: 12, weight: .medium))
+        if viewModel.selectedRepository != nil {
+          HStack(spacing: 8) {
+            Button(action: { viewModel.selectRepository() }) {
+              HStack(spacing: 6) {
+                Image(systemName: "folder")
+                  .font(.system(size: 11))
+                Text(viewModel.selectedRepository?.name ?? "Select repository")
+                  .font(.system(size: 12, weight: .medium))
+              }
+            }
+            .buttonStyle(.plain)
+
+            Button(action: {
+              withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.clearSelectedRepository()
+              }
+            }) {
+              Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
           }
           .padding(.horizontal, 12)
           .padding(.vertical, 6)
@@ -226,8 +248,27 @@ public struct MultiSessionLaunchView: View {
             Capsule()
               .stroke(Color.borderSubtle, lineWidth: 1)
           )
+        } else {
+          Button(action: { viewModel.selectRepository() }) {
+            HStack(spacing: 6) {
+              Image(systemName: "folder")
+                .font(.system(size: 11))
+              Text("Select repository")
+                .font(.system(size: 12, weight: .medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+              Capsule()
+                .fill(Color.primary.opacity(0.05))
+            )
+            .overlay(
+              Capsule()
+                .stroke(Color.borderSubtle, lineWidth: 1)
+            )
+          }
+          .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
 
         Button(action: { showingFilePicker = true }) {
           HStack(spacing: 6) {
