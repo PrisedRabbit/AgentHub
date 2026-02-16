@@ -15,6 +15,7 @@ public struct WelcomeView: View {
   let onStartSession: (String?) -> Void
 
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.runtimeTheme) private var runtimeTheme
 
   public init(viewModel: CLISessionsViewModel, onStartSession: @escaping (String?) -> Void) {
     self.viewModel = viewModel
@@ -289,7 +290,11 @@ public struct WelcomeView: View {
   // MARK: - Background
 
   private var backgroundGradient: some View {
-    colorScheme == .dark ? Color.black : Color.white
+    if runtimeTheme?.hasCustomBackgrounds == true {
+      Color.adaptiveBackground(for: colorScheme, theme: runtimeTheme)
+    } else {
+      colorScheme == .dark ? Color(white: 0.06) : Color(white: 0.96)
+    }
   }
 
   private var cardBackground: some View {
