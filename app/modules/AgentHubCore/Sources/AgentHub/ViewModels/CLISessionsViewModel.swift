@@ -313,6 +313,18 @@ public final class CLISessionsViewModel {
     terminal.typeText(text)
   }
 
+  /// Focuses the terminal for a given key so it receives keyboard input.
+  /// Uses a short delay to let SwiftUI layout settle before requesting AppKit first responder.
+  public func focusTerminal(forKey key: String) {
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(100))
+      guard let terminal = activeTerminals[key],
+            let terminalView = terminal.terminalView,
+            let window = terminalView.window else { return }
+      window.makeFirstResponder(terminalView)
+    }
+  }
+
   /// Sessions being started in Hub's embedded terminal (no session ID yet)
   public var pendingHubSessions: [PendingHubSession] = []
 

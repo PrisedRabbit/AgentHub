@@ -294,6 +294,12 @@ public struct MultiProviderMonitoringPanelView: View {
     .onChange(of: effectivePrimarySessionId) { _, _ in
       sidePanelContent = nil
     }
+    .onChange(of: primarySessionId) { _, newId in
+      guard let newId else { return }
+      if let item = filteredItems.first(where: { $0.id == newId }) {
+        item.viewModel.focusTerminal(forKey: item.sessionId)
+      }
+    }
     .onChange(of: canShowSidePanel) { _, canShow in
       if !canShow {
         withAnimation(.easeInOut(duration: 0.25)) {
