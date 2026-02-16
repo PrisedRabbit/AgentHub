@@ -15,6 +15,7 @@ public struct WelcomeView: View {
   let onStartSession: (String?) -> Void
 
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.runtimeTheme) private var runtimeTheme
 
   public init(viewModel: CLISessionsViewModel, onStartSession: @escaping (String?) -> Void) {
     self.viewModel = viewModel
@@ -46,12 +47,12 @@ public struct WelcomeView: View {
     VStack(spacing: 14) {
       ZStack {
         Circle()
-          .fill(Color.brandPrimary.opacity(0.1))
+          .fill(Color.primary.opacity(0.1))
           .frame(width: 76, height: 76)
 
         Image(systemName: "apple.terminal.on.rectangle")
           .font(.system(size: 30))
-          .foregroundColor(.brandPrimary)
+          .foregroundColor(.primary)
       }
 
       VStack(spacing: 6) {
@@ -79,9 +80,9 @@ public struct WelcomeView: View {
         .padding(.horizontal, 20)
         .background(
           RoundedRectangle(cornerRadius: 10)
-            .fill(Color.brandPrimary)
+            .fill(Color.primary)
         )
-        .shadow(color: Color.brandPrimary.opacity(0.28), radius: 6, y: 3)
+        .shadow(color: Color.primary.opacity(0.28), radius: 6, y: 3)
       }
       .buttonStyle(.plain)
       .padding(.top, 2)
@@ -204,7 +205,7 @@ public struct WelcomeView: View {
     HStack(spacing: 7) {
       Image(systemName: icon)
         .font(.system(size: 11))
-        .foregroundColor(.brandPrimary)
+        .foregroundColor(.primary)
 
       Text(title)
         .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -216,7 +217,7 @@ public struct WelcomeView: View {
     HStack(spacing: 12) {
       Image(systemName: icon)
         .font(.system(size: 12))
-        .foregroundColor(.brandPrimary)
+        .foregroundColor(.primary)
         .frame(width: 16)
 
       Text(description)
@@ -240,7 +241,7 @@ public struct WelcomeView: View {
     HStack(alignment: .top, spacing: 12) {
       Image(systemName: icon)
         .font(.system(size: 12))
-        .foregroundColor(.brandSecondary)
+        .foregroundColor(.primary)
         .frame(width: 16)
 
       VStack(alignment: .leading, spacing: 3) {
@@ -289,7 +290,11 @@ public struct WelcomeView: View {
   // MARK: - Background
 
   private var backgroundGradient: some View {
-    colorScheme == .dark ? Color.black : Color.white
+    if runtimeTheme?.hasCustomBackgrounds == true {
+      Color.adaptiveBackground(for: colorScheme, theme: runtimeTheme)
+    } else {
+      colorScheme == .dark ? Color(white: 0.06) : Color(white: 0.96)
+    }
   }
 
   private var cardBackground: some View {

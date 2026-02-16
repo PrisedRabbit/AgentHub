@@ -1018,8 +1018,10 @@ public struct MultiProviderSessionsListView: View {
         newIndex = max(currentIndex - 1, 0)
       }
       primarySessionId = items[newIndex].id
+      scrollToSessionId = items[newIndex].id
     } else {
       primarySessionId = items.first?.id
+      scrollToSessionId = items.first?.id
     }
   }
 }
