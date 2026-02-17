@@ -157,6 +157,13 @@ colors:
     light: "#FFFFFF"
 ```
 
+## Contributing
+
+- **One PR per feature or bug fix.** Each pull request should address a single, focused change.
+- **Keep PRs small.** Small, reviewable diffs get merged faster and are easier to reason about.
+- **AI-generated code is welcome** as long as the PR represents one cohesive feature or fix.
+- **Unrelated changes bundled together will not be reviewed or accepted.** If you have multiple fixes, open separate PRs for each.
+
 ## Privacy
 
 AgentHub runs entirely on your machine. It does not collect, transmit, or store any data externally. The app simply reads your local CLI session files to display their status.
