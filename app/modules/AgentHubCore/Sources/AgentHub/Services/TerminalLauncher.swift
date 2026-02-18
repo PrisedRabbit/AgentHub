@@ -219,7 +219,7 @@ public struct TerminalLauncher {
       try scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
 
       // Make it executable
-      let attributes = [FileAttributeKey.posixPermissions: 0o755]
+      let attributes = [FileAttributeKey.posixPermissions: 0o700]
       try FileManager.default.setAttributes(attributes, ofItemAtPath: scriptPath)
 
       // Open the script with Terminal
@@ -313,7 +313,7 @@ public struct TerminalLauncher {
 
     do {
       try scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
-      let attributes = [FileAttributeKey.posixPermissions: 0o755]
+      let attributes = [FileAttributeKey.posixPermissions: 0o700]
       try FileManager.default.setAttributes(attributes, ofItemAtPath: scriptPath)
 
       let url = URL(fileURLWithPath: scriptPath)
@@ -403,7 +403,7 @@ public struct TerminalLauncher {
 
     do {
       try scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
-      let attributes = [FileAttributeKey.posixPermissions: 0o755]
+      let attributes = [FileAttributeKey.posixPermissions: 0o700]
       try FileManager.default.setAttributes(attributes, ofItemAtPath: scriptPath)
 
       let url = URL(fileURLWithPath: scriptPath)
