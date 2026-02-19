@@ -221,6 +221,8 @@ public struct MultiProviderMonitoringPanelView: View {
   @Binding var primarySessionId: String?
   @AppStorage(AgentHubDefaults.hubLayoutMode)
   private var layoutModeRawValue: Int = LayoutMode.single.rawValue
+  @AppStorage(AgentHubDefaults.hubPreviousLayoutMode)
+  private var previousLayoutModeRawValue: Int = -1
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.runtimeTheme) private var runtimeTheme
 
@@ -339,7 +341,10 @@ public struct MultiProviderMonitoringPanelView: View {
       // Layout mode toggle (single / list / grid)
       HStack(spacing: 6) {
         ForEach(LayoutMode.allCases, id: \.self) { mode in
-          Button(action: { layoutModeRawValue = mode.rawValue }) {
+          Button(action: {
+            previousLayoutModeRawValue = -1
+            layoutModeRawValue = mode.rawValue
+          }) {
             Image(systemName: mode.icon)
               .font(.caption)
               .foregroundColor(layoutMode == mode ? .primary : .secondary)

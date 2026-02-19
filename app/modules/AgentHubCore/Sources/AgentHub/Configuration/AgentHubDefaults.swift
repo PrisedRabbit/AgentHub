@@ -98,6 +98,10 @@ public enum AgentHubDefaults {
   /// Type: Int (default: 0 = single)
   public static let hubLayoutMode = "\(keyPrefix)hub.layoutMode"
 
+  /// Previous hub layout mode saved by Toggle Focus Mode (Cmd+\)
+  /// Type: Int (default: -1 = no saved layout)
+  public static let hubPreviousLayoutMode = "\(keyPrefix)hub.previousLayoutMode"
+
   /// Whether the selected sessions panel is expanded
   /// Type: Bool (default: true)
   public static let selectedSessionsPanelExpanded = "\(keyPrefix)ui.selectedSessionsPanelExpanded"
