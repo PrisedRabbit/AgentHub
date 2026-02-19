@@ -115,7 +115,7 @@ In Single layout, a side panel can show: `GitDiffView` (split-pane diff), `PlanV
 
 ### Keyboard Shortcuts
 
-Cmd+K (palette), Cmd+N (new session), Cmd+B (sidebar), Cmd+[/] (navigate sessions), Escape (dismiss).
+Cmd+K (palette), Cmd+N (new session), Cmd+B (sidebar), Cmd+[/] (navigate sessions), Cmd+\ (toggle focus mode), Escape (dismiss).
 
 ## Dependencies
 

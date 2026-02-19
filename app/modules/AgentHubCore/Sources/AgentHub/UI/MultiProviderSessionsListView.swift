@@ -42,6 +42,12 @@ public struct MultiProviderSessionsListView: View {
   @Environment(\.runtimeTheme) private var runtimeTheme
   @Environment(\.openSettings) private var openSettings
 
+  @AppStorage(AgentHubDefaults.hubLayoutMode)
+  private var layoutModeRawValue: Int = 0
+
+  @AppStorage(AgentHubDefaults.hubPreviousLayoutMode)
+  private var previousLayoutModeRawValue: Int = -1
+
   @AppStorage(AgentHubDefaults.selectedSidePanelProvider)
   private var selectedProviderRaw: String = "Claude"
 
@@ -219,6 +225,10 @@ public struct MultiProviderSessionsListView: View {
 
       Button("") { navigateSessionHistory(direction: .forward) }
         .keyboardShortcut("]", modifiers: .command)
+        .hidden()
+
+      Button("") { toggleFocusMode() }
+        .keyboardShortcut("\\", modifiers: .command)
         .hidden()
     }
   }
@@ -974,6 +984,9 @@ public struct MultiProviderSessionsListView: View {
 
     case .toggleSidebar:
       columnVisibility = columnVisibility == .all ? .detailOnly : .all
+
+    case .toggleFocusMode:
+      toggleFocusMode()
     }
   }
 
@@ -996,6 +1009,22 @@ public struct MultiProviderSessionsListView: View {
       let didPreselect = await multiLaunchViewModel.preselectRepository(path: preferredRepositoryPath)
       if !didPreselect {
         multiLaunchViewModel.selectRepository()
+      }
+    }
+  }
+
+  private func toggleFocusMode() {
+    let singleRaw = 0
+    if layoutModeRawValue != singleRaw {
+      previousLayoutModeRawValue = layoutModeRawValue
+      withAnimation(.easeInOut(duration: 0.2)) {
+        layoutModeRawValue = singleRaw
+      }
+    } else if previousLayoutModeRawValue >= 0 {
+      let restoreTo = previousLayoutModeRawValue
+      previousLayoutModeRawValue = -1
+      withAnimation(.easeInOut(duration: 0.2)) {
+        layoutModeRawValue = restoreTo
       }
     }
   }
