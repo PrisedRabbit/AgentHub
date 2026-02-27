@@ -50,7 +50,8 @@ public struct CLICommandConfiguration: Codable, Sendable {
   public func argumentsForSession(
     sessionId: String?,
     prompt: String?,
-    dangerouslySkipPermissions: Bool = false
+    dangerouslySkipPermissions: Bool = false,
+    worktreeName: String? = nil
   ) -> [String] {
     let prefix = subcommandArgs
 
@@ -58,9 +59,20 @@ public struct CLICommandConfiguration: Codable, Sendable {
     case .claude:
       var args: [String] = []
 
-      // Add flag only for NEW sessions (not resume)
-      if dangerouslySkipPermissions && (sessionId == nil || sessionId?.isEmpty == true || sessionId?.hasPrefix("pending-") == true) {
-        args.append("--dangerously-skip-permissions")
+      let isNewSession = sessionId == nil || sessionId?.isEmpty == true || sessionId?.hasPrefix("pending-") == true
+
+      // Add flags only for NEW sessions (not resume)
+      if isNewSession {
+        if dangerouslySkipPermissions {
+          args.append("--dangerously-skip-permissions")
+        }
+        if let name = worktreeName {
+          if name.isEmpty {
+            args.append("--worktree")
+          } else {
+            args += ["--worktree", name]
+          }
+        }
       }
 
       if let sessionId, !sessionId.isEmpty, !sessionId.hasPrefix("pending-") {

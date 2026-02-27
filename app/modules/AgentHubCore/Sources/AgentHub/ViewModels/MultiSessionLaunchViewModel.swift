@@ -109,6 +109,8 @@ public final class MultiSessionLaunchViewModel {
   public var launchMode: LaunchMode = .manual
   public var workMode: WorkMode = .local
   public var claudeMode: ClaudeMode = .disabled
+  public var claudeUseWorktree: Bool = false
+  public var claudeWorktreeName: String = ""
   public var isCodexSelected: Bool = false
   public var sharedPrompt: String = ""
   public var attachedFiles: [AttachedFile] = []
@@ -146,6 +148,13 @@ public final class MultiSessionLaunchViewModel {
   // MARK: - Computed
 
   public var isClaudeSelected: Bool { claudeMode.isSelected }
+
+  /// Returns the --worktree name option when Claude is enabled and worktree mode is on.
+  /// nil = no --worktree flag; "" = auto-generated name; non-empty = named worktree
+  public var claudeWorktreeOption: String? {
+    guard claudeMode.isSelected && claudeUseWorktree else { return nil }
+    return claudeWorktreeName
+  }
 
   public var selectedProviders: [SessionProviderKind] {
     var providers: [SessionProviderKind] = []
@@ -656,6 +665,8 @@ public final class MultiSessionLaunchViewModel {
     launchMode = .manual
     workMode = .local
     claudeMode = .disabled
+    claudeUseWorktree = false
+    claudeWorktreeName = ""
     isCodexSelected = false
     claudeProgress = .idle
     codexProgress = .idle
@@ -679,10 +690,14 @@ public final class MultiSessionLaunchViewModel {
 
     try? await Task.sleep(for: .milliseconds(300))
 
+    let worktreeBranchName: String = {
+      if let name = claudeWorktreeOption, !name.isEmpty { return name }
+      return currentBranchName.isEmpty ? "main" : currentBranchName
+    }()
     let worktree = WorktreeBranch(
-      name: currentBranchName.isEmpty ? "main" : currentBranchName,
+      name: worktreeBranchName,
       path: repoPath,
-      isWorktree: false
+      isWorktree: claudeWorktreeOption != nil
     )
 
     if providers.contains(.claude) {
@@ -692,7 +707,8 @@ public final class MultiSessionLaunchViewModel {
         worktree,
         initialPrompt: initialPrompt,
         initialInputText: initialInputText,
-        dangerouslySkipPermissions: claudeMode.dangerouslySkipPermissions
+        dangerouslySkipPermissions: claudeMode.dangerouslySkipPermissions,
+        worktreeName: claudeWorktreeOption
       )
     }
 

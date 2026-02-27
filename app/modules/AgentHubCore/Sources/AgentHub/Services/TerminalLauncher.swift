@@ -224,7 +224,8 @@ public struct TerminalLauncher {
     skipCheckout: Bool = false,
     claudeClient: ClaudeCode,
     initialPrompt: String? = nil,
-    dangerouslySkipPermissions: Bool = false
+    dangerouslySkipPermissions: Bool = false,
+    worktreeName: String? = nil
   ) -> Error? {
     let claudeCommand = claudeClient.configuration.command
 
@@ -256,17 +257,33 @@ public struct TerminalLauncher {
     // Build the dangerous flag if needed (hardcoded literal, safe to append)
     let dangerousFlag = dangerouslySkipPermissions ? " --dangerously-skip-permissions" : ""
 
+    // Build the --worktree flag if needed (name is validated via shellEscapeSingleQuoted)
+    let worktreeFlag: String
+    if let name = worktreeName {
+      if name.isEmpty {
+        worktreeFlag = " --worktree"
+      } else if let escapedName = shellEscapeSingleQuoted(name) {
+        worktreeFlag = " --worktree \(escapedName)"
+      } else {
+        worktreeFlag = " --worktree"
+      }
+    } else {
+      worktreeFlag = ""
+    }
+
+    let flags = "\(dangerousFlag)\(worktreeFlag)"
+
     // Build the command - for worktrees or when skipCheckout is true, just cd and run claude
     // Otherwise, checkout the branch first
     let command: String
     if isWorktree || skipCheckout {
       if let prompt = escapedPrompt {
-        command = "cd \(escapedPath) && \(escapedClaudePath)\(dangerousFlag) \(prompt)"
+        command = "cd \(escapedPath) && \(escapedClaudePath)\(flags) \(prompt)"
       } else {
-        command = "cd \(escapedPath) && \(escapedClaudePath)\(dangerousFlag)"
+        command = "cd \(escapedPath) && \(escapedClaudePath)\(flags)"
       }
     } else {
-      command = "cd \(escapedPath) && git checkout \(escapedBranch) && \(escapedClaudePath)\(dangerousFlag)"
+      command = "cd \(escapedPath) && git checkout \(escapedBranch) && \(escapedClaudePath)\(flags)"
     }
 
     return launchTerminalScript(command: command, scriptPrefix: "claude_open")

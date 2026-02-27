@@ -54,6 +54,10 @@ public struct MultiSessionLaunchView: View {
 
           providerPills
 
+          if viewModel.selectedRepository != nil && viewModel.isClaudeSelected && !viewModel.isCodexSelected && viewModel.workMode == .local {
+            worktreeRow
+          }
+
           if viewModel.isLaunching && viewModel.workMode == .worktree {
             progressSection
           }
@@ -619,6 +623,74 @@ public struct MultiSessionLaunchView: View {
       return colorScheme == .dark
         ? Color(nsColor: NSColor(srgbRed: 0.96, green: 0.64, blue: 0.64, alpha: 1))
         : Color(nsColor: NSColor(srgbRed: 0.91, green: 0.54, blue: 0.54, alpha: 1))
+    }
+  }
+
+  // MARK: - Worktree Row
+
+  private var worktreeRow: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 8) {
+        Button(action: {
+          withAnimation(.easeInOut(duration: 0.2)) {
+            viewModel.claudeUseWorktree.toggle()
+            if !viewModel.claudeUseWorktree {
+              viewModel.claudeWorktreeName = ""
+            }
+          }
+        }) {
+          HStack(spacing: 4) {
+            Image(systemName: "arrow.triangle.branch")
+              .font(.system(size: 9))
+            Text("--worktree")
+              .font(.system(size: 11, weight: .medium))
+          }
+          .foregroundColor(viewModel.claudeUseWorktree ? (colorScheme == .dark ? .black : .white) : .secondary)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 5)
+          .background(
+            Capsule()
+              .fill(
+                viewModel.claudeUseWorktree
+                  ? (colorScheme == .dark ? Color.white : Color.black)
+                  : Color.primary.opacity(0.06)
+              )
+          )
+        }
+        .buttonStyle(.plain)
+
+        if viewModel.claudeUseWorktree {
+          TextField("auto-generated name", text: $viewModel.claudeWorktreeName)
+            .font(.system(size: 11))
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+              RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.05))
+            )
+            .frame(maxWidth: 200)
+            .transition(.opacity.combined(with: .move(edge: .leading)))
+        }
+
+        Spacer()
+      }
+
+      if viewModel.claudeUseWorktree {
+        Text(worktreeCommandCaption)
+          .font(.system(size: 10, design: .monospaced))
+          .foregroundColor(.secondary.opacity(0.6))
+          .transition(.opacity)
+      }
+    }
+  }
+
+  private var worktreeCommandCaption: String {
+    let name = viewModel.claudeWorktreeName
+    if name.isEmpty {
+      return "claude --worktree  ← name will be auto-generated"
+    } else {
+      return "claude --worktree \(name)"
     }
   }
 
