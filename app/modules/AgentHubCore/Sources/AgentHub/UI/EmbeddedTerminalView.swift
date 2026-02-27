@@ -53,6 +53,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
   let initialInputText: String?  // Optional: text to prefill terminal input without Enter
   let viewModel: CLISessionsViewModel?  // For shared terminal storage
   let dangerouslySkipPermissions: Bool  // One-shot flag for new sessions
+  let worktreeName: String?  // nil = no --worktree; "" = auto-name; non-empty = named
   let onUserInteraction: (() -> Void)?
 
   public init(
@@ -64,6 +65,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
     initialInputText: String? = nil,
     viewModel: CLISessionsViewModel? = nil,
     dangerouslySkipPermissions: Bool = false,
+    worktreeName: String? = nil,
     onUserInteraction: (() -> Void)? = nil
   ) {
     self.terminalKey = terminalKey
@@ -74,6 +76,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
     self.initialInputText = initialInputText
     self.viewModel = viewModel
     self.dangerouslySkipPermissions = dangerouslySkipPermissions
+    self.worktreeName = worktreeName
     self.onUserInteraction = onUserInteraction
   }
 
@@ -90,7 +93,8 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
         initialPrompt: initialPrompt,
         initialInputText: initialInputText,
         isDark: isDark,
-        dangerouslySkipPermissions: dangerouslySkipPermissions
+        dangerouslySkipPermissions: dangerouslySkipPermissions,
+        worktreeName: worktreeName
       )
       terminalContainer.onUserInteraction = onUserInteraction
       return terminalContainer
@@ -105,7 +109,8 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
       initialPrompt: initialPrompt,
       initialInputText: initialInputText,
       isDark: isDark,
-      dangerouslySkipPermissions: dangerouslySkipPermissions
+      dangerouslySkipPermissions: dangerouslySkipPermissions,
+      worktreeName: worktreeName
     )
     containerView.onUserInteraction = onUserInteraction
     return containerView
@@ -188,7 +193,8 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
     initialPrompt: String? = nil,
     initialInputText: String? = nil,
     isDark: Bool = true,
-    dangerouslySkipPermissions: Bool = false
+    dangerouslySkipPermissions: Bool = false,
+    worktreeName: String? = nil
   ) {
     guard !isConfigured else { return }
     isConfigured = true
@@ -220,7 +226,8 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
       projectPath: projectPath,
       cliConfiguration: cliConfiguration,
       initialPrompt: initialPrompt,
-      dangerouslySkipPermissions: dangerouslySkipPermissions
+      dangerouslySkipPermissions: dangerouslySkipPermissions,
+      worktreeName: worktreeName
     )
     registerProcessIfNeeded(for: terminal)
 
@@ -361,7 +368,8 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
     projectPath: String,
     cliConfiguration: CLICommandConfiguration,
     initialPrompt: String? = nil,
-    dangerouslySkipPermissions: Bool = false
+    dangerouslySkipPermissions: Bool = false,
+    worktreeName: String? = nil
   ) {
     // Find the CLI executable using just the executable name (first word of command)
     let command = cliConfiguration.command
@@ -434,7 +442,8 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
     let args = cliConfiguration.argumentsForSession(
       sessionId: sessionId,
       prompt: initialPrompt,
-      dangerouslySkipPermissions: dangerouslySkipPermissions
+      dangerouslySkipPermissions: dangerouslySkipPermissions,
+      worktreeName: worktreeName
     )
     let escapedArgs = args.map { $0.replacingOccurrences(of: "'", with: "'\\''") }
     let joinedArgs = escapedArgs.map { "'\($0)'" }.joined(separator: " ")

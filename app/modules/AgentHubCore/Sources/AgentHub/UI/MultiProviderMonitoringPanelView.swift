@@ -470,6 +470,7 @@ public struct MultiProviderMonitoringPanelView: View {
           terminalKey: pendingId,
           viewModel: viewModel,
           dangerouslySkipPermissions: pending.dangerouslySkipPermissions,
+          worktreeName: pending.worktreeName,
           onToggleTerminal: { _ in },
           onStopMonitoring: { viewModel.cancelPendingSession(pending) },
           onConnect: { },
@@ -613,6 +614,7 @@ public struct MultiProviderMonitoringPanelView: View {
               terminalKey: "pending-\(pending.id.uuidString)",
               viewModel: viewModel,
               dangerouslySkipPermissions: pending.dangerouslySkipPermissions,
+          worktreeName: pending.worktreeName,
               onToggleTerminal: { _ in },
               onStopMonitoring: { viewModel.cancelPendingSession(pending) },
               onConnect: { },
@@ -748,6 +750,7 @@ public struct MultiProviderMonitoringPanelView: View {
           terminalKey: "pending-\(pending.id.uuidString)",
           viewModel: viewModel,
           dangerouslySkipPermissions: pending.dangerouslySkipPermissions,
+          worktreeName: pending.worktreeName,
           onToggleTerminal: { _ in },
           onStopMonitoring: {
             viewModel.cancelPendingSession(pending)

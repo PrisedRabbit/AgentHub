@@ -247,7 +247,8 @@ public final class CLISessionsViewModel {
     initialPrompt: String?,
     initialInputText: String? = nil,
     isDark: Bool = true,
-    dangerouslySkipPermissions: Bool = false
+    dangerouslySkipPermissions: Bool = false,
+    worktreeName: String? = nil
   ) -> TerminalContainerView {
     if let existing = activeTerminals[key] {
       #if DEBUG
@@ -278,7 +279,8 @@ public final class CLISessionsViewModel {
       initialPrompt: initialPrompt,
       initialInputText: initialInputText,
       isDark: isDark,
-      dangerouslySkipPermissions: dangerouslySkipPermissions
+      dangerouslySkipPermissions: dangerouslySkipPermissions,
+      worktreeName: worktreeName
     )
     activeTerminals[key] = terminal
     return terminal
@@ -1248,7 +1250,8 @@ public final class CLISessionsViewModel {
     _ worktree: WorktreeBranch,
     initialPrompt: String? = nil,
     initialInputText: String? = nil,
-    dangerouslySkipPermissions: Bool = false
+    dangerouslySkipPermissions: Bool = false,
+    worktreeName: String? = nil
   ) {
     // Each pending session gets a unique ID, so no need to clear existing terminals
     // Terminals are now keyed by session ID, not worktree path
@@ -1256,7 +1259,8 @@ public final class CLISessionsViewModel {
       worktree: worktree,
       initialPrompt: initialPrompt,
       initialInputText: initialInputText,
-      dangerouslySkipPermissions: dangerouslySkipPermissions
+      dangerouslySkipPermissions: dangerouslySkipPermissions,
+      worktreeName: worktreeName
     )
     pendingHubSessions.append(pending)
     lastCreatedPendingId = pending.id
@@ -1296,8 +1300,20 @@ public final class CLISessionsViewModel {
   /// Watches the Claude project directory for a new session file
   @MainActor
   private func watchForNewClaudeSession(pending: PendingHubSession, worktree: WorktreeBranch) async {
+    // Auto-named --worktree: we don't know the path ahead of time, poll history.jsonl instead
+    if let worktreeName = pending.worktreeName, worktreeName.isEmpty {
+      await pollForWorktreeHistoryEntry(pending: pending, repoPath: worktree.path)
+      return
+    }
+
     let claudeDataPath = FileManager.default.homeDirectoryForCurrentUser.path + "/.claude"
-    let encodedPath = worktree.path.claudeProjectPathEncoded
+    let watchPath: String
+    if let worktreeName = pending.worktreeName, !worktreeName.isEmpty {
+      watchPath = worktree.path + "/.claude/worktrees/" + worktreeName
+    } else {
+      watchPath = worktree.path
+    }
+    let encodedPath = watchPath.claudeProjectPathEncoded
     let projectDir = "\(claudeDataPath)/projects/\(encodedPath)"
 #if DEBUG
     AppLogger.watcher.debug(
@@ -1480,26 +1496,26 @@ public final class CLISessionsViewModel {
           }
         }
 
-        // Third fallback: check session file directly for new worktrees
-        // This handles the case where history.jsonl hasn't been updated yet
-        // TODO: Review - only triggers for worktrees with zero sessions
-        let currentSessions = selectedRepositories
-          .flatMap { $0.worktrees }
-          .first { $0.path == worktree.path }?
-          .sessions ?? []
-
+        // Third fallback: check session file directly
+        // This handles new worktrees where history.jsonl hasn't been updated yet,
+        // and ensures pending sessions always resolve even after retry exhaustion.
         let claudeDataPath = FileManager.default.homeDirectoryForCurrentUser.path + "/.claude"
-        let encodedPath = worktree.path.claudeProjectPathEncoded
+        let effectivePath: String
+        if let worktreeName = pending.worktreeName, !worktreeName.isEmpty {
+          effectivePath = worktree.path + "/.claude/worktrees/" + worktreeName
+        } else {
+          effectivePath = worktree.path
+        }
+        let encodedPath = effectivePath.claudeProjectPathEncoded
         let fallbackSessionFilePath = "\(claudeDataPath)/projects/\(encodedPath)/\(sessionId).jsonl"
         if providerKind == .claude,
-           currentSessions.isEmpty,
            FileManager.default.fileExists(atPath: fallbackSessionFilePath) {
           // Session file exists but not in history.jsonl yet - create directly
           let newSession = CLISession(
             id: sessionId,
-            projectPath: worktree.path,
-            branchName: worktree.name,
-            isWorktree: worktree.isWorktree,
+            projectPath: effectivePath,
+            branchName: pending.worktreeName ?? worktree.name,
+            isWorktree: pending.worktreeName != nil,
             lastActivityAt: Date(),
             messageCount: 0,
             isActive: true,
@@ -1508,7 +1524,9 @@ public final class CLISessionsViewModel {
           )
 
           for repoIndex in selectedRepositories.indices {
-            if let wtIndex = selectedRepositories[repoIndex].worktrees.firstIndex(where: { $0.path == worktree.path }) {
+            if let wtIndex = selectedRepositories[repoIndex].worktrees.firstIndex(where: {
+              $0.path == effectivePath || $0.path == worktree.path
+            }) {
               selectedRepositories[repoIndex].worktrees[wtIndex].sessions.insert(newSession, at: 0)
               break
             }
@@ -1527,6 +1545,11 @@ public final class CLISessionsViewModel {
 #endif
           return
         }
+
+        let currentSessions = selectedRepositories
+          .flatMap { $0.worktrees }
+          .first { $0.path == worktree.path }?
+          .sessions ?? []
 
         if providerKind == .codex,
            currentSessions.isEmpty,
@@ -1621,6 +1644,60 @@ public final class CLISessionsViewModel {
 #endif
         // Directory exists now - restart watching
         await watchForNewClaudeSession(pending: pending, worktree: worktree)
+        return
+      }
+    }
+  }
+
+  /// Polls ~/.claude/history.jsonl for a new entry whose project path starts with
+  /// `repoPath/.claude/worktrees/`. Used for auto-named `--worktree` sessions where
+  /// the exact worktree path isn't known until Claude CLI creates it.
+  @MainActor
+  private func pollForWorktreeHistoryEntry(pending: PendingHubSession, repoPath: String) async {
+    let claudeDataPath = FileManager.default.homeDirectoryForCurrentUser.path + "/.claude"
+    let historyPath = "\(claudeDataPath)/history.jsonl"
+    let worktreePrefix = repoPath + "/.claude/worktrees/"
+
+#if DEBUG
+    AppLogger.watcher.debug(
+      "[PollWorktreeHistory] pendingId=\(pending.id.uuidString, privacy: .public) prefix=\(worktreePrefix, privacy: .public)"
+    )
+#endif
+
+    while true {
+      try? await Task.sleep(for: .seconds(1))
+
+      if !pendingHubSessions.contains(where: { $0.id == pending.id }) { return }
+
+      guard let contents = try? String(contentsOfFile: historyPath, encoding: .utf8) else { continue }
+
+      // Parse history.jsonl lines for entries with matching project path after pending.startedAt
+      let lines = contents.components(separatedBy: "\n").filter { !$0.isEmpty }
+      for line in lines.reversed() {
+        guard let data = line.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let sessionId = json["sessionId"] as? String,
+              let projectPath = json["project"] as? String,
+              projectPath.hasPrefix(worktreePrefix) else { continue }
+
+        // Only consider entries created after this pending session started
+        var entryDate: Date?
+        if let ts = json["timestamp"] as? String {
+          entryDate = ISO8601DateFormatter().date(from: ts)
+        }
+        if let date = entryDate, date < pending.startedAt { continue }
+
+#if DEBUG
+        AppLogger.watcher.debug(
+          "[PollWorktreeHistory] pendingId=\(pending.id.uuidString, privacy: .public) found sessionId=\(sessionId, privacy: .public) at \(projectPath, privacy: .public)"
+        )
+#endif
+        let resolvedWorktree = WorktreeBranch(
+          name: URL(fileURLWithPath: projectPath).lastPathComponent,
+          path: projectPath,
+          isWorktree: true
+        )
+        handleNewSessionFound(sessionId: sessionId, pending: pending, worktree: resolvedWorktree)
         return
       }
     }
