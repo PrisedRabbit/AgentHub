@@ -40,6 +40,7 @@ public struct CodexSessionJSONLParser {
     public var lastActivityAt: Date?
     public var sessionStartedAt: Date?
     public var currentStatus: SessionStatus = .idle
+    public var hasMermaidContent: Bool = false
 
     public init() {}
   }
@@ -196,6 +197,7 @@ public struct CodexSessionJSONLParser {
     case "agent_message":
       result.messageCount += 1
       if let message = payload["message"] as? String, !message.isEmpty {
+        if message.contains("```mermaid") { result.hasMermaidContent = true }
         addActivity(type: .assistantMessage, description: String(message.prefix(80)), timestamp: timestamp, to: &result)
       }
 

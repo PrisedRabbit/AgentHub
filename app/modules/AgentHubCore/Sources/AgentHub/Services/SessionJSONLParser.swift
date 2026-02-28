@@ -84,6 +84,7 @@ public struct SessionJSONLParser {
     public var sessionStartedAt: Date?
     public var currentStatus: SessionStatus = .idle
     public var gitBranch: String?
+    public var hasMermaidContent: Bool = false
 
     public init() {}
   }
@@ -285,6 +286,9 @@ public struct SessionJSONLParser {
         )
 
       case "text":
+        if let text = block.text, text.contains("```mermaid") {
+          result.hasMermaidContent = true
+        }
         addActivity(
           type: .assistantMessage,
           description: block.text?.prefix(50).description ?? "",

@@ -16,6 +16,7 @@ private enum SidePanelContent: Equatable {
   case diff(sessionId: String, session: CLISession, projectPath: String)
   case plan(sessionId: String, session: CLISession, planState: PlanState)
   case webPreview(sessionId: String, session: CLISession, projectPath: String)
+  case mermaid(sessionId: String, session: CLISession)
 
   static func == (lhs: SidePanelContent, rhs: SidePanelContent) -> Bool {
     switch (lhs, rhs) {
@@ -25,6 +26,8 @@ private enum SidePanelContent: Equatable {
       return id1 == id2
     case (.webPreview(let id1, _, let p1), .webPreview(let id2, _, let p2)):
       return id1 == id2 && p1 == p2
+    case (.mermaid(let id1, _), .mermaid(let id2, _)):
+      return id1 == id2
     default: return false
     }
   }
@@ -562,6 +565,9 @@ public struct MultiProviderMonitoringPanelView: View {
             onShowWebPreview: canShowSidePanel ? { session, projectPath in
               sidePanelContent = .webPreview(sessionId: session.id, session: session, projectPath: projectPath)
             } : nil,
+            onShowMermaid: canShowSidePanel ? { session in
+              sidePanelContent = .mermaid(sessionId: session.id, session: session)
+            } : nil,
             onPromptConsumed: {
               viewModel.clearPendingPrompt(for: session.id)
             },
@@ -610,6 +616,12 @@ public struct MultiProviderMonitoringPanelView: View {
       WebPreviewView(
         session: session,
         projectPath: projectPath,
+        onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { sidePanelContent = nil } },
+        isEmbedded: true
+      )
+    case .mermaid(_, let session):
+      MermaidDiagramView(
+        session: session,
         onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { sidePanelContent = nil } },
         isEmbedded: true
       )
