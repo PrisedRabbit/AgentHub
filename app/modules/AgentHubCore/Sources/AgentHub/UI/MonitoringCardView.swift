@@ -416,34 +416,37 @@ public struct MonitoringCardView: View {
         Text(customName)
           .font(.subheadline)
           .fontWeight(.medium)
+          .lineLimit(1)
       } else if let slug = session.slug {
-        // Show slug and short ID (matching CLISessionRow format)
-        HStack(spacing: 4) {
-          Text(slug)
-            .font(.system(.subheadline, design: .monospaced))
-            .fontWeight(.semibold)
-          Text("•")
-            .font(.caption)
-            .foregroundColor(.secondary)
-          Text(session.shortId)
-            .font(.system(.subheadline, design: .monospaced))
-            .fontWeight(.semibold)
-        }
+        // Show slug (truncates first) and short ID (always shown)
+        Text(slug)
+          .font(.system(.subheadline, design: .monospaced))
+          .fontWeight(.semibold)
+          .lineLimit(1)
+        Text("•")
+          .font(.caption)
+          .foregroundColor(.secondary)
+          .fixedSize()
+          .layoutPriority(1)
+        Text(session.shortId)
+          .font(.system(.subheadline, design: .monospaced))
+          .fontWeight(.semibold)
+          .fixedSize()
+          .layoutPriority(1)
       } else {
-        HStack(spacing: 4) {
-          Text("Session:")
-            .font(.subheadline)
-            .foregroundColor(.secondary)
-          Text(session.shortId)
-            .font(.system(.subheadline, design: .monospaced))
-            .fontWeight(.bold)
-        }
+        Text(session.shortId)
+          .font(.system(.subheadline, design: .monospaced))
+          .fontWeight(.bold)
+          .fixedSize()
+          .layoutPriority(1)
       }
 
       // Provider name with brand color
       Text(providerKind.rawValue)
         .font(.caption)
         .foregroundColor(.brandPrimary(for: providerKind))
+        .fixedSize()
+        .layoutPriority(1)
 
       Spacer()
 
@@ -474,6 +477,8 @@ public struct MonitoringCardView: View {
         .background(Color.secondary.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .animation(.easeInOut(duration: 0.2), value: showTerminal)
+        .fixedSize()
+        .layoutPriority(2)
       }
 
       // TODO: Consider removing later
@@ -554,6 +559,7 @@ public struct MonitoringCardView: View {
           .lineLimit(1)
           .truncationMode(.middle)
       }
+      .layoutPriority(1)
 
       // Branch name in brand color
       if let branch = session.branchName {
@@ -561,108 +567,82 @@ public struct MonitoringCardView: View {
           .font(.caption)
           .fontWeight(.medium)
           .foregroundColor(.brandPrimary(for: providerKind))
+          .lineLimit(1)
+          .layoutPriority(1)
       }
 
       Spacer()
 
-      // Pending changes preview button - show immediately when code change tool is detected
-      if let pendingToolUse = state?.pendingToolUse,
-         pendingToolUse.isCodeChangeTool {
-        Button(action: {
-          pendingChangesSheetItem = PendingChangesSheetItem(
-            session: session,
-            pendingToolUse: pendingToolUse
-          )
-        }) {
-          HStack(spacing: 4) {
-            Image(systemName: "eye")
-              .font(.caption2)
-            Text("Edits")
-              .font(.caption2)
-          }
-          .foregroundColor(.orange)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 4)
-          .background(Color.orange.opacity(0.1))
-          .clipShape(RoundedRectangle(cornerRadius: 4))
-        }
-        .buttonStyle(.plain)
-        .help("Preview pending \(pendingToolUse.toolName) change")
-      }
-
-      // Plan button
-      if let planState = planState {
-        Button(action: {
-          if let onShowPlan = onShowPlan {
-            onShowPlan(session, planState)
-          } else {
-            planSheetItem = PlanSheetItem(
+      // Action buttons — fixed size, never shrink
+      HStack(spacing: 6) {
+        // Pending changes preview button - show immediately when code change tool is detected
+        if let pendingToolUse = state?.pendingToolUse,
+           pendingToolUse.isCodeChangeTool {
+          Button(action: {
+            pendingChangesSheetItem = PendingChangesSheetItem(
               session: session,
-              planState: planState
+              pendingToolUse: pendingToolUse
             )
+          }) {
+            HStack(spacing: 4) {
+              Image(systemName: "eye")
+                .font(.caption2)
+              Text("Edits")
+                .font(.caption2)
+            }
+            .foregroundColor(.orange)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.orange.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
           }
-        }) {
-          HStack(spacing: 4) {
-            Image(systemName: "list.bullet.clipboard")
-              .font(.caption2)
-            Text("Plan")
-              .font(.caption2)
+          .buttonStyle(.plain)
+          .help("Preview pending \(pendingToolUse.toolName) change")
+        }
+
+        // Plan button
+        if let planState = planState {
+          Button(action: {
+            if let onShowPlan = onShowPlan {
+              onShowPlan(session, planState)
+            } else {
+              planSheetItem = PlanSheetItem(
+                session: session,
+                planState: planState
+              )
+            }
+          }) {
+            HStack(spacing: 4) {
+              Image(systemName: "list.bullet.clipboard")
+                .font(.caption2)
+              Text("Plan")
+                .font(.caption2)
+            }
+            .foregroundColor(.orange)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.orange.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
           }
-          .foregroundColor(.orange)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 4)
-          .background(Color.orange.opacity(0.1))
-          .clipShape(RoundedRectangle(cornerRadius: 4))
+          .buttonStyle(.plain)
+          .help("View session plan")
         }
-        .buttonStyle(.plain)
-        .help("View session plan")
-      }
 
-      // Diff button
-      Button(action: {
-        if let onShowDiff = onShowDiff {
-          onShowDiff(session, session.projectPath)
-        } else {
-          gitDiffSheetItem = GitDiffSheetItem(
-            session: session,
-            projectPath: session.projectPath
-          )
-        }
-      }) {
-        HStack(spacing: 4) {
-          Image(systemName: "arrow.left.arrow.right")
-            .font(.caption2)
-          Text("Diff")
-            .font(.caption2)
-        }
-        .foregroundColor(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.secondary.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 4))
-      }
-      .buttonStyle(.plain)
-      .help("View git unstaged changes")
-
-      // Web preview button (only visible for web projects)
-      let framework = ProjectFramework.detect(at: session.projectPath)
-      if framework.requiresDevServer
-          || framework == .unknown
-          || FileManager.default.fileExists(atPath: "\(session.projectPath)/index.html") {
+        // Diff button
         Button(action: {
-          if let onShowWebPreview = onShowWebPreview {
-            onShowWebPreview(session, session.projectPath)
+          if let onShowDiff = onShowDiff {
+            onShowDiff(session, session.projectPath)
           } else {
-            webPreviewSheetItem = WebPreviewSheetItem(
+            gitDiffSheetItem = GitDiffSheetItem(
               session: session,
               projectPath: session.projectPath
             )
           }
         }) {
           HStack(spacing: 4) {
-            Image(systemName: "globe")
+            Image(systemName: "arrow.left.arrow.right")
               .font(.caption2)
-            Text("Preview")
+            Text("Diff")
               .font(.caption2)
           }
           .foregroundColor(.secondary)
@@ -672,52 +652,85 @@ public struct MonitoringCardView: View {
           .clipShape(RoundedRectangle(cornerRadius: 4))
         }
         .buttonStyle(.plain)
-        .help("Preview localhost web app")
-      }
+        .help("View git unstaged changes")
 
-      // Mermaid diagram button (only visible when mermaid content is detected)
-      if state?.hasMermaidContent == true {
-        Button(action: {
-          if let onShowMermaid {
-            onShowMermaid(session)
-          } else {
-            mermaidSheetSession = session
+        // Web preview button (only visible for web projects)
+        let framework = ProjectFramework.detect(at: session.projectPath)
+        if framework.requiresDevServer
+            || framework == .unknown
+            || FileManager.default.fileExists(atPath: "\(session.projectPath)/index.html") {
+          Button(action: {
+            if let onShowWebPreview = onShowWebPreview {
+              onShowWebPreview(session, session.projectPath)
+            } else {
+              webPreviewSheetItem = WebPreviewSheetItem(
+                session: session,
+                projectPath: session.projectPath
+              )
+            }
+          }) {
+            HStack(spacing: 4) {
+              Image(systemName: "globe")
+                .font(.caption2)
+              Text("Preview")
+                .font(.caption2)
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
           }
-        }) {
-          HStack(spacing: 4) {
-            Image(systemName: "chart.xyaxis.line")
-              .font(.caption2)
-            Text("Diagram")
-              .font(.caption2)
-          }
-          .foregroundColor(.secondary)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 4)
-          .background(Color.secondary.opacity(0.1))
-          .clipShape(RoundedRectangle(cornerRadius: 4))
+          .buttonStyle(.plain)
+          .help("Preview localhost web app")
         }
-        .buttonStyle(.plain)
-        .help("View Mermaid diagrams")
-      }
 
-      // Terminal refresh button (only visible when terminal is shown)
-      if showTerminal {
-        Button(action: onRefreshTerminal) {
-          HStack(spacing: 4) {
-            Image(systemName: "arrow.clockwise")
-              .font(.caption2)
-            Text("Refresh terminal")
-              .font(.caption2)
+        // Mermaid diagram button (only visible when mermaid content is detected)
+        if state?.hasMermaidContent == true {
+          Button(action: {
+            if let onShowMermaid {
+              onShowMermaid(session)
+            } else {
+              mermaidSheetSession = session
+            }
+          }) {
+            HStack(spacing: 4) {
+              Image(systemName: "chart.xyaxis.line")
+                .font(.caption2)
+              Text("Diagram")
+                .font(.caption2)
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
           }
-          .foregroundColor(.secondary)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 4)
-          .background(Color.secondary.opacity(0.1))
-          .clipShape(RoundedRectangle(cornerRadius: 4))
+          .buttonStyle(.plain)
+          .help("View Mermaid diagrams")
         }
-        .buttonStyle(.plain)
-        .help("Refresh terminal (reload session history)")
+
+        // Terminal refresh button (only visible when terminal is shown)
+        if showTerminal {
+          Button(action: onRefreshTerminal) {
+            HStack(spacing: 4) {
+              Image(systemName: "arrow.clockwise")
+                .font(.caption2)
+              Text("Refresh terminal")
+                .font(.caption2)
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+          }
+          .buttonStyle(.plain)
+          .help("Refresh terminal (reload session history)")
+        }
       }
+      .fixedSize()
+      .layoutPriority(2)
     }
   }
 
