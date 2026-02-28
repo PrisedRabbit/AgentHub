@@ -70,6 +70,7 @@ public struct MonitoringCardView: View {
   let onShowDiff: ((CLISession, String) -> Void)?
   let onShowPlan: ((CLISession, PlanState) -> Void)?
   let onShowWebPreview: ((CLISession, String) -> Void)?
+  let onShowMermaid: ((CLISession) -> Void)?
   let onPromptConsumed: (() -> Void)?
   let onTerminalInteraction: (() -> Void)?
   let isMaximized: Bool
@@ -82,6 +83,7 @@ public struct MonitoringCardView: View {
   @State private var planSheetItem: PlanSheetItem?
   @State private var pendingChangesSheetItem: PendingChangesSheetItem?
   @State private var webPreviewSheetItem: WebPreviewSheetItem?
+  @State private var mermaidSheetSession: CLISession?
   @State private var isDragging = false
   @State private var showingActionsPopover = false
   @State private var showingFilePicker = false
@@ -113,6 +115,7 @@ public struct MonitoringCardView: View {
     onShowDiff: ((CLISession, String) -> Void)? = nil,
     onShowPlan: ((CLISession, PlanState) -> Void)? = nil,
     onShowWebPreview: ((CLISession, String) -> Void)? = nil,
+    onShowMermaid: ((CLISession) -> Void)? = nil,
     onPromptConsumed: (() -> Void)? = nil,
     onTerminalInteraction: (() -> Void)? = nil,
     isMaximized: Bool = false,
@@ -144,6 +147,7 @@ public struct MonitoringCardView: View {
     self.onShowDiff = onShowDiff
     self.onShowPlan = onShowPlan
     self.onShowWebPreview = onShowWebPreview
+    self.onShowMermaid = onShowMermaid
     self.onPromptConsumed = onPromptConsumed
     self.onTerminalInteraction = onTerminalInteraction
     self.isMaximized = isMaximized
@@ -245,6 +249,12 @@ public struct MonitoringCardView: View {
         session: item.session,
         projectPath: item.projectPath,
         onDismiss: { webPreviewSheetItem = nil }
+      )
+    }
+    .sheet(item: $mermaidSheetSession) { session in
+      MermaidDiagramView(
+        session: session,
+        onDismiss: { mermaidSheetSession = nil }
       )
     }
     .sheet(isPresented: $showingNameSheet) {
@@ -663,6 +673,31 @@ public struct MonitoringCardView: View {
         }
         .buttonStyle(.plain)
         .help("Preview localhost web app")
+      }
+
+      // Mermaid diagram button (only visible when mermaid content is detected)
+      if state?.hasMermaidContent == true {
+        Button(action: {
+          if let onShowMermaid {
+            onShowMermaid(session)
+          } else {
+            mermaidSheetSession = session
+          }
+        }) {
+          HStack(spacing: 4) {
+            Image(systemName: "chart.xyaxis.line")
+              .font(.caption2)
+            Text("Diagram")
+              .font(.caption2)
+          }
+          .foregroundColor(.secondary)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .background(Color.secondary.opacity(0.1))
+          .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+        .help("View Mermaid diagrams")
       }
 
       // Terminal refresh button (only visible when terminal is shown)

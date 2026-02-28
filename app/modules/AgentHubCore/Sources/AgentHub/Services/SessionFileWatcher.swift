@@ -357,7 +357,8 @@ public actor SessionFileWatcher {
       model: result.model,
       gitBranch: result.gitBranch,
       pendingToolUse: pendingToolUse,
-      recentActivities: result.recentActivities
+      recentActivities: result.recentActivities,
+      hasMermaidContent: result.hasMermaidContent
     )
   }
 

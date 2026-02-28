@@ -37,6 +37,9 @@ public struct SessionMonitorState: Equatable, Sendable {
   // Recent activity log
   public var recentActivities: [ActivityEntry]
 
+  // Mermaid diagram detection
+  public var hasMermaidContent: Bool
+
   public init(
     status: SessionStatus = .idle,
     currentTool: String? = nil,
@@ -52,7 +55,8 @@ public struct SessionMonitorState: Equatable, Sendable {
     model: String? = nil,
     gitBranch: String? = nil,
     pendingToolUse: PendingToolUse? = nil,
-    recentActivities: [ActivityEntry] = []
+    recentActivities: [ActivityEntry] = [],
+    hasMermaidContent: Bool = false
   ) {
     self.status = status
     self.currentTool = currentTool
@@ -69,6 +73,7 @@ public struct SessionMonitorState: Equatable, Sendable {
     self.gitBranch = gitBranch
     self.pendingToolUse = pendingToolUse
     self.recentActivities = recentActivities
+    self.hasMermaidContent = hasMermaidContent
   }
 
   // MARK: - Computed Properties
