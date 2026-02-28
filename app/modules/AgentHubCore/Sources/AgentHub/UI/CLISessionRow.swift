@@ -105,7 +105,7 @@ public struct CLISessionRow: View {
           .foregroundColor(.primary)
           .lineLimit(1)
       } else if let slug = session.slug {
-        // Show slug and short ID (no "Session:" label)
+        // Show slug (truncates first) and short ID (always shown)
         Text(slug)
           .font(.system(.subheadline, design: .monospaced, weight: .semibold))
           .foregroundColor(.primary)
@@ -114,17 +114,23 @@ public struct CLISessionRow: View {
         Text("•")
           .font(.caption)
           .foregroundColor(.secondary)
+          .fixedSize()
+          .layoutPriority(1)
 
         Text(session.shortId)
           .font(.system(.subheadline, design: .monospaced))
           .foregroundColor(.primary)
           .fontWeight(.semibold)
+          .fixedSize()
+          .layoutPriority(1)
       } else {
         // No slug - show "Session:" label with ID
         Text("Session: \(session.shortId)")
           .font(.system(.subheadline, design: .monospaced))
           .foregroundColor(.primary)
           .fontWeight(.semibold)
+          .fixedSize()
+          .layoutPriority(1)
       }
 
       // Copy session ID button with animated confirmation
@@ -147,6 +153,8 @@ public struct CLISessionRow: View {
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
+      .fixedSize()
+      .layoutPriority(1)
       .help("Copy full session ID")
 
       Spacer()
