@@ -17,6 +17,9 @@ public struct SettingsView: View {
   @AppStorage(AgentHubDefaults.terminalFontSize)
   private var terminalFontSize: Double = 12
 
+  @AppStorage(AgentHubDefaults.terminalFontName)
+  private var terminalFontName: String = "SF Mono"
+
   @AppStorage(AgentHubDefaults.notificationSoundsEnabled)
   private var notificationSoundsEnabled: Bool = true
 
@@ -38,6 +41,12 @@ public struct SettingsView: View {
   @Environment(ThemeManager.self) private var themeManager
   @AppStorage(AgentHubDefaults.selectedTheme) private var selectedThemeId: String = "claude"
   private let defaultThemeId = "claude"
+
+  private var availableFonts: [String] {
+    NSFontManager.shared.availableFontFamilies
+      .filter { NSFont(name: $0, size: 12)?.isFixedPitch == true }
+      .sorted()
+  }
 
   public init() {}
 
@@ -148,6 +157,17 @@ public struct SettingsView: View {
       }
 
       Section("Terminal") {
+        Picker("Font", selection: $terminalFontName) {
+          ForEach(availableFonts, id: \.self) { name in
+            Text(name).tag(name)
+          }
+        }
+        .onChange(of: terminalFontName) { _, newValue in
+          if !availableFonts.contains(newValue), let first = availableFonts.first {
+            terminalFontName = first
+          }
+        }
+
         Stepper(value: $terminalFontSize, in: 8...24, step: 1) {
           HStack {
             Text("Font size")
@@ -157,6 +177,7 @@ public struct SettingsView: View {
               .monospacedDigit()
           }
         }
+
       }
 
       Section {
@@ -189,6 +210,9 @@ public struct SettingsView: View {
     .task {
       await themeManager.discoverThemes()
       await ensureSupportedThemeSelection()
+      if !availableFonts.contains(terminalFontName), let first = availableFonts.first {
+        terminalFontName = first
+      }
     }
   }
 
