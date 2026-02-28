@@ -223,6 +223,8 @@ public struct MultiProviderMonitoringPanelView: View {
   private var layoutModeRawValue: Int = LayoutMode.single.rawValue
   @AppStorage(AgentHubDefaults.hubPreviousLayoutMode)
   private var previousLayoutModeRawValue: Int = -1
+  @AppStorage(AgentHubDefaults.flatSessionLayout)
+  private var flatSessionLayout: Bool = false
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.runtimeTheme) private var runtimeTheme
 
@@ -427,19 +429,42 @@ public struct MultiProviderMonitoringPanelView: View {
       ScrollViewReader { proxy in
         ScrollView {
           if layoutMode == .list {
-            LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
-              monitoredSessionsGroupedContent
+            if flatSessionLayout {
+              LazyVStack(spacing: 12) {
+                ForEach(flatSortedItems) { item in
+                  itemCardView(for: item)
+                }
+              }
+              .padding(12)
+              .transition(.opacity)
+            } else {
+              LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
+                monitoredSessionsGroupedContent
+              }
+              .padding(12)
+              .transition(.opacity)
             }
-            .padding(12)
           } else {
             let columns = Array(repeating: GridItem(.flexible(), alignment: .top), count: layoutMode.columnCount)
-            LazyVGrid(columns: columns, spacing: 12, pinnedViews: [.sectionHeaders]) {
-              monitoredSessionsGroupedContent
+            if flatSessionLayout {
+              LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(flatSortedItems) { item in
+                  itemCardView(for: item)
+                }
+              }
+              .padding(12)
+              .transition(.opacity)
+            } else {
+              LazyVGrid(columns: columns, spacing: 12, pinnedViews: [.sectionHeaders]) {
+                monitoredSessionsGroupedContent
+              }
+              .padding(12)
+              .transition(.opacity)
             }
-            .padding(12)
           }
         }
         .animation(.easeInOut(duration: 0.2), value: layoutMode)
+        .animation(.easeInOut(duration: 0.25), value: flatSessionLayout)
         .onChange(of: primarySessionId) { _, newId in
           guard let newId else { return }
           withAnimation(.easeInOut(duration: 0.25)) {
@@ -591,6 +616,103 @@ public struct MultiProviderMonitoringPanelView: View {
     }
   }
 
+  // MARK: - Single Card View
+
+  @ViewBuilder
+  private func itemCardView(for item: ProviderMonitoringItem) -> some View {
+    let isPrimary = item.id == effectivePrimarySessionId
+    switch item {
+    case .pending(_, let viewModel, let pending):
+      MonitoringCardView(
+        session: pending.placeholderSession,
+        state: nil,
+        claudeClient: viewModel.claudeClient,
+        cliConfiguration: viewModel.cliConfiguration,
+        providerKind: item.providerKind,
+        showTerminal: true,
+        initialPrompt: pending.initialPrompt,
+        initialInputText: pending.initialInputText,
+        terminalKey: "pending-\(pending.id.uuidString)",
+        viewModel: viewModel,
+        dangerouslySkipPermissions: pending.dangerouslySkipPermissions,
+        worktreeName: pending.worktreeName,
+        onToggleTerminal: { _ in },
+        onStopMonitoring: { viewModel.cancelPendingSession(pending) },
+        onConnect: { },
+        onCopySessionId: { },
+        onOpenSessionFile: { },
+        onRefreshTerminal: { },
+        onTerminalInteraction: { setPrimarySessionIfNeeded(item.id) },
+        isMaximized: maximizedSessionId == item.id,
+        onToggleMaximize: {
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            maximizedSessionId = maximizedSessionId == item.id ? nil : item.id
+          }
+        },
+        isPrimarySession: isPrimary,
+        showPrimaryIndicator: layoutMode != .single
+      )
+      .id(item.id)
+
+    case .monitored(_, let viewModel, let session, let state):
+      let planState = state.flatMap { PlanState.from(activities: $0.recentActivities) }
+      let initialPrompt = viewModel.pendingPrompt(for: session.id)
+
+      MonitoringCardView(
+        session: session,
+        state: state,
+        planState: planState,
+        claudeClient: viewModel.claudeClient,
+        cliConfiguration: viewModel.cliConfiguration,
+        providerKind: item.providerKind,
+        showTerminal: viewModel.sessionsWithTerminalView.contains(session.id),
+        initialPrompt: initialPrompt,
+        terminalKey: session.id,
+        viewModel: viewModel,
+        onToggleTerminal: { show in
+          viewModel.setTerminalView(for: session.id, show: show)
+        },
+        onStopMonitoring: {
+          viewModel.stopMonitoring(session: session)
+        },
+        onConnect: {
+          _ = viewModel.connectToSession(session)
+        },
+        onCopySessionId: {
+          viewModel.copySessionId(session)
+        },
+        onOpenSessionFile: {
+          openSessionFile(for: session, viewModel: viewModel)
+        },
+        onRefreshTerminal: {
+          viewModel.refreshTerminal(
+            forKey: session.id,
+            sessionId: session.id,
+            projectPath: session.projectPath
+          )
+        },
+        onInlineRequestSubmit: { prompt, sess in
+          viewModel.showTerminalWithPrompt(for: sess, prompt: prompt)
+        },
+        onPromptConsumed: {
+          viewModel.clearPendingPrompt(for: session.id)
+        },
+        onTerminalInteraction: { setPrimarySessionIfNeeded(item.id) },
+        isMaximized: maximizedSessionId == item.id,
+        onToggleMaximize: {
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            maximizedSessionId = maximizedSessionId == item.id ? nil : item.id
+          }
+        },
+        isPrimarySession: isPrimary,
+        showPrimaryIndicator: layoutMode != .single
+      )
+      .id(item.id)
+    }
+  }
+
+  // MARK: - Grouped Content by Module
+
   @ViewBuilder
   private var monitoredSessionsGroupedContent: some View {
     ForEach(groupedMonitoredSessions, id: \.modulePath) { group in
@@ -599,95 +721,7 @@ public struct MultiProviderMonitoringPanelView: View {
         sessionCount: group.items.count
       )) {
         ForEach(group.items) { item in
-          let isPrimary = item.id == effectivePrimarySessionId
-          switch item {
-          case .pending(_, let viewModel, let pending):
-            MonitoringCardView(
-              session: pending.placeholderSession,
-              state: nil,
-              claudeClient: viewModel.claudeClient,
-              cliConfiguration: viewModel.cliConfiguration,
-              providerKind: item.providerKind,
-              showTerminal: true,
-              initialPrompt: pending.initialPrompt,
-              initialInputText: pending.initialInputText,
-              terminalKey: "pending-\(pending.id.uuidString)",
-              viewModel: viewModel,
-              dangerouslySkipPermissions: pending.dangerouslySkipPermissions,
-          worktreeName: pending.worktreeName,
-              onToggleTerminal: { _ in },
-              onStopMonitoring: { viewModel.cancelPendingSession(pending) },
-              onConnect: { },
-              onCopySessionId: { },
-              onOpenSessionFile: { },
-              onRefreshTerminal: { },
-              onTerminalInteraction: { setPrimarySessionIfNeeded(item.id) },
-              isMaximized: maximizedSessionId == item.id,
-              onToggleMaximize: {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                  maximizedSessionId = maximizedSessionId == item.id ? nil : item.id
-                }
-              },
-              isPrimarySession: isPrimary,
-              showPrimaryIndicator: layoutMode != .single
-            )
-            .id(item.id)
-
-          case .monitored(_, let viewModel, let session, let state):
-            let planState = state.flatMap { PlanState.from(activities: $0.recentActivities) }
-            let initialPrompt = viewModel.pendingPrompt(for: session.id)
-
-            MonitoringCardView(
-              session: session,
-              state: state,
-              planState: planState,
-              claudeClient: viewModel.claudeClient,
-              cliConfiguration: viewModel.cliConfiguration,
-              providerKind: item.providerKind,
-              showTerminal: viewModel.sessionsWithTerminalView.contains(session.id),
-              initialPrompt: initialPrompt,
-              terminalKey: session.id,
-              viewModel: viewModel,
-              onToggleTerminal: { show in
-                viewModel.setTerminalView(for: session.id, show: show)
-              },
-              onStopMonitoring: {
-                viewModel.stopMonitoring(session: session)
-              },
-              onConnect: {
-                _ = viewModel.connectToSession(session)
-              },
-              onCopySessionId: {
-                viewModel.copySessionId(session)
-              },
-              onOpenSessionFile: {
-                openSessionFile(for: session, viewModel: viewModel)
-              },
-              onRefreshTerminal: {
-                viewModel.refreshTerminal(
-                  forKey: session.id,
-                  sessionId: session.id,
-                  projectPath: session.projectPath
-                )
-              },
-              onInlineRequestSubmit: { prompt, sess in
-                viewModel.showTerminalWithPrompt(for: sess, prompt: prompt)
-              },
-              onPromptConsumed: {
-                viewModel.clearPendingPrompt(for: session.id)
-              },
-              onTerminalInteraction: { setPrimarySessionIfNeeded(item.id) },
-              isMaximized: maximizedSessionId == item.id,
-              onToggleMaximize: {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                  maximizedSessionId = maximizedSessionId == item.id ? nil : item.id
-                }
-              },
-              isPrimarySession: isPrimary,
-              showPrimaryIndicator: layoutMode != .single
-            )
-            .id(item.id)
-          }
+          itemCardView(for: item)
         }
       }
     }
@@ -860,6 +894,10 @@ public struct MultiProviderMonitoringPanelView: View {
     let grouped = Dictionary(grouping: visibleItems) { findModulePath(for: $0) }
     return grouped.sorted { $0.key < $1.key }
       .map { (modulePath: $0.key, items: $0.value.sorted { $0.timestamp > $1.timestamp }) }
+  }
+
+  private var flatSortedItems: [ProviderMonitoringItem] {
+    groupedMonitoredSessions.flatMap { $0.items }
   }
 
   private var allSelectedRepositories: [SelectedRepository] {
