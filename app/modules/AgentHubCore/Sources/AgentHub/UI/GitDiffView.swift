@@ -53,8 +53,9 @@ public struct GitDiffView: View {
   @State private var expandedPaths: Set<String> = []
   @State private var showSidebar: Bool = true
   @State private var treeCommonPrefix: String = ""
+  @State private var reloadTrigger = 0
 
-  private let gitDiffService = GitDiffService()
+  @Environment(\.gitDiffService) private var gitDiffService
 
   public init(
     session: CLISession,
@@ -135,8 +136,11 @@ public struct GitDiffView: View {
       onDismiss()
       return .handled
     }
-    .task {
+    .task(id: "\(reloadTrigger)|\(diffMode.rawValue)") {
       await loadChanges(for: diffMode)
+    }
+    .task {
+      await watchGitState()
     }
     .confirmationDialog(
       "Discard Unsent Comments?",
@@ -200,9 +204,6 @@ public struct GitDiffView: View {
       .pickerStyle(.segmented)
       .frame(width: 250)
       .tint(Color.primary)
-      .onChange(of: diffMode) { _, newMode in
-        Task { await loadChanges(for: newMode) }
-      }
 
       Button("Close") {
         if commentsState.hasComments {
@@ -531,6 +532,21 @@ public struct GitDiffView: View {
   // MARK: - Data Loading
 
   private func loadChanges(for mode: DiffMode) async {
+    // Fast path: show cached state immediately without a loading spinner
+    let gitRoot = (try? await gitDiffService.findGitRoot(at: projectPath)) ?? projectPath
+    if let cached = await gitDiffService.getCachedState(repoPath: gitRoot, mode: mode) {
+      diffState = cached
+      isLoading = false
+      let treeResult = buildFileTree(from: cached.files)
+      treeCommonPrefix = treeResult.commonPrefix
+      expandedPaths = treeResult.allFolderPaths
+      if selectedFileId == nil, let first = cached.files.first {
+        selectedFileId = first.id
+        loadFileDiff(for: first, mode: mode)
+      }
+      return
+    }
+
     let clock = ContinuousClock()
     let totalStart = clock.now
 
@@ -611,6 +627,20 @@ public struct GitDiffView: View {
         errorMessage = error.localizedDescription
         isLoading = false
       }
+    }
+  }
+
+  private func watchGitState() async {
+    guard let gitRoot = try? await gitDiffService.findGitRoot(at: projectPath) else { return }
+    let watcher = GitStateWatcher()
+    await withTaskCancellationHandler {
+      await watcher.watch(gitRoot: gitRoot)
+      for await _ in watcher.changes {
+        await gitDiffService.invalidate(repoPath: gitRoot)
+        reloadTrigger += 1
+      }
+    } onCancel: {
+      Task { await watcher.stop() }
     }
   }
 
