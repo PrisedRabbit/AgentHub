@@ -51,6 +51,58 @@ public struct SettingsView: View {
   public init() {}
 
   public var body: some View {
+    TabView {
+      generalTab
+        .tabItem { Label("General", systemImage: "gear") }
+
+      appearanceTab
+        .tabItem { Label("Appearance", systemImage: "paintbrush") }
+
+      terminalTab
+        .tabItem { Label("Terminal", systemImage: "character.cursor.ibeam") }
+
+      notificationsTab
+        .tabItem { Label("Notifications", systemImage: "bell") }
+
+      cliTab
+        .tabItem { Label("CLI", systemImage: "terminal") }
+    }
+    .frame(width: 420, height: 260)
+    .task {
+      await ensureSupportedThemeSelection()
+      if !availableFonts.contains(terminalFontName), let first = availableFonts.first {
+        terminalFontName = first
+      }
+    }
+  }
+
+  // MARK: - Tabs
+
+  private var generalTab: some View {
+    Form {
+      Section("Features") {
+        Toggle(isOn: $smartModeEnabled) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Smart mode")
+            Text("Use AI to plan and orchestrate multi-session launches")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+        Toggle(isOn: $flatSessionLayout) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Flat session layout")
+            Text("Show all sessions without per-repository sections")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var cliTab: some View {
     Form {
       Section("CLI Status") {
         DisclosureGroup {
@@ -115,47 +167,12 @@ public struct SettingsView: View {
           }
         }
       }
+    }
+    .formStyle(.grouped)
+  }
 
-      Section {
-        Toggle(isOn: $notificationSoundsEnabled) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Notification sounds")
-            Text("Play a sound when tools require approval")
-              .font(.caption)
-              .foregroundColor(.secondary)
-          }
-        }
-        Toggle(isOn: $pushNotificationsEnabled) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Push notifications")
-            Text("Show a notification banner when tools require approval")
-              .font(.caption)
-              .foregroundColor(.secondary)
-          }
-        }
-      } header: {
-        Text("Notifications")
-      }
-
-      Section("Features") {
-        Toggle(isOn: $smartModeEnabled) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Smart mode")
-            Text("Use AI to plan and orchestrate multi-session launches")
-              .font(.caption)
-              .foregroundColor(.secondary)
-          }
-        }
-        Toggle(isOn: $flatSessionLayout) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Flat session layout")
-            Text("Show all sessions without per-repository sections")
-              .font(.caption)
-              .foregroundColor(.secondary)
-          }
-        }
-      }
-
+  private var terminalTab: some View {
+    Form {
       Section("Terminal") {
         Picker("Font", selection: $terminalFontName) {
           ForEach(availableFonts, id: \.self) { name in
@@ -177,9 +194,37 @@ public struct SettingsView: View {
               .monospacedDigit()
           }
         }
-
       }
+    }
+    .formStyle(.grouped)
+  }
 
+  private var notificationsTab: some View {
+    Form {
+      Section("Notifications") {
+        Toggle(isOn: $notificationSoundsEnabled) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Notification sounds")
+            Text("Play a sound when tools require approval")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+        Toggle(isOn: $pushNotificationsEnabled) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Push notifications")
+            Text("Show a notification banner when tools require approval")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var appearanceTab: some View {
+    Form {
       Section {
         Picker("Theme", selection: themeSelectionBinding) {
           Text("Default").tag(defaultThemeId)
@@ -206,15 +251,9 @@ public struct SettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: 300, height: 500)
-    .task {
-      await themeManager.discoverThemes()
-      await ensureSupportedThemeSelection()
-      if !availableFonts.contains(terminalFontName), let first = availableFonts.first {
-        terminalFontName = first
-      }
-    }
   }
+
+  // MARK: - Theme Helpers
 
   private var themeSelectionBinding: Binding<String> {
     Binding(
