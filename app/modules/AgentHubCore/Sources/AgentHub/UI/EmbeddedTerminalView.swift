@@ -118,8 +118,9 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
   }
 
   public func updateNSView(_ nsView: TerminalContainerView, context: Context) {
-    // Update colors when color scheme changes
-    nsView.updateColors(isDark: colorScheme == .dark)
+    // Update colors only when color scheme actually changes
+    let isDark = colorScheme == .dark
+    nsView.updateColors(isDark: isDark)
     nsView.onUserInteraction = onUserInteraction
     nsView.updateFont(name: terminalFontName, size: CGFloat(terminalFontSize))
 
@@ -143,6 +144,7 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
   private var hasPrefilledInitialInputText = false
   private var appliedFontName: String = ""
   private var appliedFontSize: CGFloat = 0
+  private var appliedIsDark: Bool? = nil
   private var terminalPidMap: [ObjectIdentifier: pid_t] = [:]
   private var localEventMonitor: Any?
   public var onUserInteraction: (() -> Void)?
@@ -314,6 +316,8 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
   /// Updates terminal colors based on color scheme.
   /// Called when the app's color scheme changes.
   public func updateColors(isDark: Bool) {
+    guard appliedIsDark != isDark else { return }
+    appliedIsDark = isDark
     guard let terminal = terminalView else { return }
 
     if isDark {
