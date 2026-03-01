@@ -103,3 +103,19 @@ extension View {
     modifier(AgentHubModifier(provider: AgentHubProvider(configuration: configuration)))
   }
 }
+
+// MARK: - GitDiffService Environment Key
+
+private struct GitDiffServiceKey: EnvironmentKey {
+  /// One shared instance used by all GitDiffView instances — holds the cache.
+  static let defaultValue: GitDiffService = GitDiffService()
+}
+
+extension EnvironmentValues {
+  /// Shared `GitDiffService` instance. All `GitDiffView` instances share this
+  /// by default, so the diff cache persists across panel opens.
+  public var gitDiffService: GitDiffService {
+    get { self[GitDiffServiceKey.self] }
+    set { self[GitDiffServiceKey.self] = newValue }
+  }
+}
