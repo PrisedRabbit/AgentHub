@@ -89,6 +89,7 @@ public struct MonitoringCardView: View {
   @State private var showingFilePicker = false
   @State private var showingNameSheet = false
   @State private var showingRemixProviderPicker = false
+  @State private var detectedFramework: ProjectFramework? = nil
   @Environment(\.colorScheme) private var colorScheme
 
   public init(
@@ -280,6 +281,9 @@ public struct MonitoringCardView: View {
       allowsMultipleSelection: true
     ) { result in
       handlePickedFiles(result)
+    }
+    .task {
+      detectedFramework = ProjectFramework.detect(at: session.projectPath)
     }
   }
 
@@ -658,11 +662,11 @@ public struct MonitoringCardView: View {
         .buttonStyle(.plain)
         .help("View git unstaged changes")
 
-        // Web preview button (only visible for web projects)
-        let framework = ProjectFramework.detect(at: session.projectPath)
-        if framework.requiresDevServer
+        // Web preview button (only visible for web projects, computed once in .task)
+        if let framework = detectedFramework,
+           (framework.requiresDevServer
             || framework == .unknown
-            || FileManager.default.fileExists(atPath: "\(session.projectPath)/index.html") {
+            || FileManager.default.fileExists(atPath: "\(session.projectPath)/index.html")) {
           Button(action: {
             if let onShowWebPreview = onShowWebPreview {
               onShowWebPreview(session, session.projectPath)
