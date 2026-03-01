@@ -40,6 +40,34 @@ public actor GitDiffService {
 
   public init() { }
 
+  // MARK: - Cache
+
+  private struct CacheEntry {
+    var diffState: GitDiffState
+    /// File-level cache keyed by relative path. Populated lazily as files are opened.
+    var fileDiffs: [String: (oldContent: String, newContent: String)] = [:]
+    let gitRoot: String
+    let baseBranch: String?
+  }
+
+  private var cache: [String: CacheEntry] = [:]
+
+  private func cacheKey(repoPath: String, mode: DiffMode) -> String {
+    "\(repoPath)|\(mode.rawValue)"
+  }
+
+  /// Returns the cached diff state if available, without running any git commands.
+  public func getCachedState(repoPath: String, mode: DiffMode) -> GitDiffState? {
+    let key = cache.keys.first { $0.hasPrefix(repoPath) && $0.hasSuffix("|\(mode.rawValue)") }
+    return key.flatMap { cache[$0]?.diffState }
+  }
+
+  /// Clears all cached data for the given repository (any mode).
+  public func invalidate(repoPath: String) {
+    let keysToRemove = cache.keys.filter { $0.hasPrefix(repoPath) }
+    keysToRemove.forEach { cache.removeValue(forKey: $0) }
+  }
+
   // MARK: - Public API
 
   // MARK: - Mode-Aware API
@@ -55,11 +83,12 @@ public actor GitDiffService {
     mode: DiffMode,
     baseBranch: String? = nil
   ) async throws -> GitDiffState {
+    let result: GitDiffState
     switch mode {
     case .unstaged:
-      return try await getUnstagedChanges(at: repoPath)
+      result = try await getUnstagedChanges(at: repoPath)
     case .staged:
-      return try await getStagedChanges(at: repoPath)
+      result = try await getStagedChanges(at: repoPath)
     case .branch:
       let branch: String
       if let providedBranch = baseBranch {
@@ -67,8 +96,13 @@ public actor GitDiffService {
       } else {
         branch = try await detectBaseBranch(at: repoPath)
       }
-      return try await getBranchChanges(at: repoPath, baseBranch: branch)
+      result = try await getBranchChanges(at: repoPath, baseBranch: branch)
     }
+    // Store in cache
+    let gitRoot = (try? await findGitRoot(at: repoPath)) ?? repoPath
+    let key = cacheKey(repoPath: gitRoot, mode: mode)
+    cache[key] = CacheEntry(diffState: result, gitRoot: gitRoot, baseBranch: baseBranch)
+    return result
   }
 
   /// Gets all unstaged changes for a repository
@@ -290,11 +324,28 @@ public actor GitDiffService {
     mode: DiffMode = .unstaged,
     baseBranch: String? = nil
   ) async throws -> (oldContent: String, newContent: String) {
+    let gitRoot = (try? await findGitRoot(at: repoPath)) ?? repoPath
+    let key = cacheKey(repoPath: gitRoot, mode: mode)
+
+    let relativePath: String
+    if filePath.hasPrefix(gitRoot) {
+      relativePath = String(filePath.dropFirst(gitRoot.count + 1))
+    } else {
+      relativePath = filePath
+    }
+
+    // Return from file-level cache if available
+    if let cached = cache[key]?.fileDiffs[relativePath] {
+      return cached
+    }
+
+    // Fetch from git
+    let result: (oldContent: String, newContent: String)
     switch mode {
     case .unstaged:
-      return try await getUnstagedFileDiff(filePath: filePath, at: repoPath)
+      result = try await getUnstagedFileDiff(filePath: filePath, at: repoPath)
     case .staged:
-      return try await getStagedFileDiff(filePath: filePath, at: repoPath)
+      result = try await getStagedFileDiff(filePath: filePath, at: repoPath)
     case .branch:
       let branch: String
       if let providedBranch = baseBranch {
@@ -302,8 +353,11 @@ public actor GitDiffService {
       } else {
         branch = try await detectBaseBranch(at: repoPath)
       }
-      return try await getBranchFileDiff(filePath: filePath, at: repoPath, baseBranch: branch)
+      result = try await getBranchFileDiff(filePath: filePath, at: repoPath, baseBranch: branch)
     }
+
+    cache[key]?.fileDiffs[relativePath] = result
+    return result
   }
 
   /// Gets the diff content for an unstaged file (old content from HEAD, new content from disk)
