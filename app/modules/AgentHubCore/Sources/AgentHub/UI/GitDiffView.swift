@@ -604,8 +604,11 @@ public struct GitDiffView: View {
         }
       }
 
+      let loadedState = GitDiffState(files: entries)
+      await gitDiffService.storeCachedState(repoPath: gitRoot, mode: mode, state: loadedState, baseBranch: detectedBaseBranch)
+
       await MainActor.run {
-        diffState = GitDiffState(files: entries)
+        diffState = loadedState
         isLoading = false
 
         // Build tree and auto-expand all folders

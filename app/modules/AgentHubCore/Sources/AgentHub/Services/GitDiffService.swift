@@ -62,6 +62,12 @@ public actor GitDiffService {
     return key.flatMap { cache[$0]?.diffState }
   }
 
+  /// Stores a diff state in the cache for future fast-path retrieval.
+  public func storeCachedState(repoPath: String, mode: DiffMode, state: GitDiffState, baseBranch: String? = nil) {
+    let key = cacheKey(repoPath: repoPath, mode: mode)
+    cache[key] = CacheEntry(diffState: state, gitRoot: repoPath, baseBranch: baseBranch)
+  }
+
   /// Clears all cached data for the given repository (any mode).
   public func invalidate(repoPath: String) {
     let keysToRemove = cache.keys.filter { $0.hasPrefix(repoPath) }
