@@ -142,7 +142,8 @@ public final class AgentHubProvider {
           WebSessionInfo(
             session: pair.session,
             state: pair.state,
-            hasTerminal: vm.sessionsWithTerminalView.contains(pair.session.id)
+            hasTerminal: vm.sessionsWithTerminalView.contains(pair.session.id),
+            customName: vm.sessionCustomNames[pair.session.id]
           )
         }
       }

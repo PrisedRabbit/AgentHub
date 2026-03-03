@@ -14,9 +14,9 @@ public struct WebSessionInfo: Codable, Sendable {
   public let statusLabel: String
   public let hasTerminal: Bool
 
-  public init(session: CLISession, state: SessionMonitorState?, hasTerminal: Bool) {
+  public init(session: CLISession, state: SessionMonitorState?, hasTerminal: Bool, customName: String? = nil) {
     self.id = session.id
-    self.slug = session.slug ?? String(session.id.prefix(8))
+    self.slug = customName ?? session.slug ?? String(session.id.prefix(8))
     self.projectPath = session.projectPath
     self.branchName = session.branchName
     self.statusLabel = state?.status.label ?? "idle"

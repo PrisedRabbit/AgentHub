@@ -31,18 +31,17 @@
       height: 100%; background: var(--bg); color: var(--text);
       font-family: 'IBM Plex Sans', system-ui, sans-serif;
       -webkit-tap-highlight-color: transparent;
-      overscroll-behavior: none;        /* блокирует pull-to-refresh и rubber band */
+      overscroll-behavior: none; /* blocks pull-to-refresh */
       overflow: hidden;
-      touch-action: none;               /* блокирует drag страницы */
     }
 
     /* ── App shell ───────────────────────────────────────────────────────── */
     .app {
+      position: fixed;
+      top: env(safe-area-inset-top, 0px);
+      left: 0; right: 0;
+      bottom: env(safe-area-inset-bottom, 0px);
       display: flex; flex-direction: column;
-      height: 100dvh;
-      height: -webkit-fill-available; /* Safari fallback */
-      padding-top: env(safe-area-inset-top, 0px);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     /* ── Topbar ──────────────────────────────────────────────────────────── */
@@ -144,18 +143,20 @@
     }
     .drawer-overlay.open { opacity: 1; pointer-events: auto; display: block; }
     .drawer {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
-      background: var(--panel); border-radius: 18px 18px 0 0;
-      border-top: 1px solid var(--border);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      background: var(--panel); border-radius: 0 0 18px 18px;
+      border-bottom: 1px solid var(--border);
       max-height: 75dvh; display: flex; flex-direction: column;
-      transform: translateY(100%);
+      padding-top: env(safe-area-inset-top, 0px);
+      transform: translateY(-100%);
       transition: transform 280ms cubic-bezier(.32,.72,0,1);
       box-shadow: var(--shadow);
     }
     .drawer.open { transform: translateY(0); }
     .drawer-handle {
       width: 40px; height: 4px; border-radius: 2px;
-      background: var(--border); margin: 12px auto 8px; flex-shrink: 0;
+      background: var(--border); margin: 8px auto 8px; flex-shrink: 0;
+      order: 1;
     }
     .drawer-header {
       padding: 0 16px 8px; font-size: 10px; font-weight: 600;
@@ -164,7 +165,7 @@
     }
     .drawer-list {
       overflow-y: auto; flex: 1; overscroll-behavior: contain;
-      padding-bottom: env(safe-area-inset-bottom, 16px);
+      padding-bottom: 8px;
     }
 
     /* ── Terminal area ───────────────────────────────────────────────────── */
@@ -180,32 +181,51 @@
     .title-sep { color: var(--border); flex-shrink: 0; }
     #titlebar-content { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; overflow: hidden; }
     .title-folder { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #term-wrap { flex: 1; overflow: hidden; padding: 6px; background: var(--term-bg); min-height: 0; }
-
+    #term-wrap {
+      flex: 1; overflow: hidden; padding: 6px;
+      background: var(--term-bg); min-height: 0;
+      -webkit-overflow-scrolling: touch;
+      /* Anchor content to bottom so input line is always visible */
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    /* Clips to scaled dimensions — prevents dead scroll space when scale < 1 */
+    #term-scale-outer { overflow: hidden; flex-shrink: 0; }
     /* Terminal scale wrapper */
     #term-scale-wrapper { transform-origin: top left; display: inline-block; }
 
-    /* Zoom level badge */
-    #zoom-level {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px;
-      color: var(--muted); padding: 0 4px; flex-shrink: 0;
-      min-width: 32px; text-align: center; user-select: none;
+    /* ── Bottom toolbar ──────────────────────────────────────────────────── */
+    .term-toolbar {
+      display: flex; align-items: center; gap: 4px;
+      padding: 4px 8px; height: 40px;
+      border-top: 1px solid var(--border);
+      background: var(--panel); flex-shrink: 0;
+      overflow-x: auto; overflow-y: hidden;
     }
-
-    /* Zoom buttons */
-    .zoom-btn {
-      width: 26px; height: 26px; border-radius: 5px;
-      border: 1px solid var(--border);
+    .tb-sep {
+      width: 1px; height: 18px; background: var(--border);
+      flex-shrink: 0; margin: 0 2px;
+    }
+    .tb-btn {
+      height: 30px; min-width: 30px; padding: 0 8px;
+      border-radius: 6px; border: 1px solid var(--border);
       background: transparent; color: var(--muted);
-      font-size: 16px; font-family: system-ui, sans-serif;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       touch-action: manipulation; user-select: none; flex-shrink: 0;
       transition: background 120ms, color 120ms;
-      line-height: 1;
+      white-space: nowrap;
     }
-    .zoom-btn:hover { background: rgba(128,128,128,.12); color: var(--text); }
-    .zoom-btn:active { background: rgba(128,128,128,.22); }
+    .tb-btn:hover { background: rgba(128,128,128,.12); color: var(--text); }
+    .tb-btn:active { background: rgba(128,128,128,.22); }
+    .tb-btn.zoom { font-size: 16px; font-family: system-ui, sans-serif; padding: 0; width: 30px; }
+
+    /* Zoom level badge */
+    #zoom-level {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--muted); padding: 0 2px; flex-shrink: 0;
+      min-width: 28px; text-align: center; user-select: none;
+    }
 
     .placeholder {
       display: flex; align-items: center; justify-content: center;
@@ -221,10 +241,8 @@
       .topbar-title { font-size: 13px; }
     }
 
-    /* Restore touch for scrollable areas */
+    /* Scrollable lists */
     .sidebar, .drawer-list { touch-action: pan-y; }
-    /* xterm canvas needs touch events for typing */
-    .xterm, .xterm-viewport, .xterm-screen, canvas { touch-action: auto; }
 
     /* ── Reduced motion ──────────────────────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
@@ -276,12 +294,11 @@
     <div class="terminal-area">
       <div class="terminal-titlebar">
         <div id="titlebar-content"><span style="color:var(--muted)">Select a session</span></div>
-        <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" title="Zoom out (−)">−</button>
-        <span id="zoom-level">100%</span>
-        <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
       </div>
       <div id="term-wrap">
-        <div id="term-scale-wrapper"><div id="terminal"></div></div>
+        <div id="term-scale-outer">
+          <div id="term-scale-wrapper"><div id="terminal"></div></div>
+        </div>
         <div class="placeholder" id="placeholder">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
             <rect x="2" y="4" width="20" height="16" rx="2.5"/>
@@ -289,6 +306,15 @@
           </svg>
           <p>Select a session</p>
         </div>
+      </div>
+      <div class="term-toolbar" id="term-toolbar">
+        <button class="tb-btn" id="key-esc">Esc</button>
+        <button class="tb-btn" id="key-tab">Tab</button>
+        <button class="tb-btn" id="key-ctrl-c">Ctrl+C</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn zoom" id="zoom-out" aria-label="Zoom out">−</button>
+        <span id="zoom-level">100%</span>
+        <button class="tb-btn zoom" id="zoom-in" aria-label="Zoom in">+</button>
       </div>
     </div>
   </div>
@@ -471,6 +497,7 @@ function connect(id) {
     theme: xtermTheme(theme),
   });
   term.open($('terminal'));
+  setTimeout(applyScale, 100); // initial scale after xterm.js renders
 
   term.onData(d => ws?.readyState === 1 && ws.send(new TextEncoder().encode(d)));
   term.writeln('\x1b[32mConnecting…\x1b[0m');
@@ -490,7 +517,10 @@ function connect(id) {
         }
       } catch (_) {}
     } else {
-      term?.write(new Uint8Array(e.data));
+      term?.write(new Uint8Array(e.data), () => {
+        // Scroll cursor into view after each chunk of PTY data
+        term?.scrollToBottom();
+      });
     }
   };
   ws.onclose = () => term?.writeln('\r\n\x1b[33m[Disconnected]\x1b[0m');
@@ -499,63 +529,143 @@ function connect(id) {
 
 // ── Scale terminal to fit container ───────────────────────────────────────
 
-const MIN_ZOOM = 0.3, MAX_ZOOM = 2.5, ZOOM_STEP = 0.1;
-let userZoom = parseFloat(localStorage.getItem('ah-zoom') || '1.0');
+const MIN_ZOOM = 30, MAX_ZOOM = 250, ZOOM_STEP = 10; // integer percentages
+let userZoomPct = parseInt(localStorage.getItem('ah-zoom-pct') || '180', 10);
 
 function applyScale() {
   if (!term) return;
   const wrap = $('term-wrap');
+  const outer = $('term-scale-outer');
   const scaleEl = $('term-scale-wrapper');
-  if (!wrap || !scaleEl) return;
+  if (!wrap || !outer || !scaleEl) return;
 
-  const cellW = term._core?._renderService?.dimensions?.actualCellWidth;
-  const cellH = term._core?._renderService?.dimensions?.actualCellHeight;
+  // Try multiple xterm.js internal API paths for cell dimensions
+  const dims = term._core?._renderService?.dimensions;
+  const cellW = dims?.css?.cell?.width || dims?.actualCellWidth || dims?.width;
+  const cellH = dims?.css?.cell?.height || dims?.actualCellHeight || dims?.height;
   if (!cellW || !cellH) {
-    requestAnimationFrame(applyScale);
+    // Fallback: measure from the DOM element directly
+    const el = $('terminal');
+    if (!el || !el.clientWidth || !term.cols) { requestAnimationFrame(applyScale); return; }
+    const fallbackW = el.clientWidth / term.cols;
+    const fallbackH = el.clientHeight / term.rows;
+    doScale(wrap, outer, scaleEl, fallbackW, fallbackH);
     return;
   }
+  doScale(wrap, outer, scaleEl, cellW, cellH);
+}
 
-  const containerW = wrap.clientWidth - 12;
-  const containerH = wrap.clientHeight - 12;
+function doScale(wrap, outer, scaleEl, cellW, cellH) {
+
+  const pad = 12;
+  const containerW = wrap.clientWidth - pad;
+  const containerH = wrap.clientHeight - pad;
   const termW = term.cols * cellW;
   const termH = term.rows * cellH;
 
-  // Fit to both width AND height so cursor stays visible when keyboard opens
-  const fitW = termW > 0 ? containerW / termW : 1.0;
-  const fitH = termH > 0 ? containerH / termH : 1.0;
-  const autoFit = Math.min(1.0, fitW, fitH);
-  const scale = autoFit * userZoom;
+  // Auto-fit to container width, then apply user zoom multiplier
+  const autoFit = termW > 0 ? Math.min(1.0, containerW / termW) : 1.0;
+  const scale = autoFit * (userZoomPct / 100);
 
   scaleEl.style.transform = `scale(${scale})`;
   scaleEl.style.width  = termW + 'px';
   scaleEl.style.height = termH + 'px';
-  wrap.style.overflow = scale > 1 ? 'auto' : 'hidden';
+
+  // Clip outer to scaled size — eliminates dead scroll space when scale < 1
+  const scaledW = Math.ceil(termW * scale);
+  const scaledH = Math.ceil(termH * scale);
+  outer.style.width  = scaledW + 'px';
+  outer.style.height = scaledH + 'px';
+
+  // Only enable parent scroll when terminal visually overflows container
+  wrap.style.overflow = (scaledW > containerW || scaledH > containerH) ? 'auto' : 'hidden';
+
+  // Badge always shows clean userZoom percentage
+  $('zoom-level').textContent = userZoomPct + '%';
 }
 
 function updateZoomBadge() {
-  $('zoom-level').textContent = Math.round(userZoom * 100) + '%';
+  $('zoom-level').textContent = userZoomPct + '%';
 }
 updateZoomBadge();
 
-$('zoom-in').addEventListener('click', () => {
-  userZoom = Math.min(MAX_ZOOM, parseFloat((userZoom + ZOOM_STEP).toFixed(2)));
-  localStorage.setItem('ah-zoom', userZoom);
+function doZoom(dir) {
+  userZoomPct = dir > 0
+    ? Math.min(MAX_ZOOM, userZoomPct + ZOOM_STEP)
+    : Math.max(MIN_ZOOM, userZoomPct - ZOOM_STEP);
+  localStorage.setItem('ah-zoom-pct', userZoomPct);
   updateZoomBadge();
   applyScale();
-});
-$('zoom-out').addEventListener('click', () => {
-  userZoom = Math.max(MIN_ZOOM, parseFloat((userZoom - ZOOM_STEP).toFixed(2)));
-  localStorage.setItem('ah-zoom', userZoom);
-  updateZoomBadge();
-  applyScale();
-});
+}
+$('zoom-in').addEventListener('touchend',  () => doZoom(1));
+$('zoom-in').addEventListener('click',     () => doZoom(1));
+$('zoom-out').addEventListener('touchend', () => doZoom(-1));
+$('zoom-out').addEventListener('click',    () => doZoom(-1));
 
-// Keyboard on mobile: visualViewport shrinks when keyboard appears
-window.visualViewport?.addEventListener('resize', () => {
-  applyScale();
-  term?.scrollToBottom();
-});
+// ── Special key buttons (mobile) ──────────────────────────────────────────
+function sendKey(seq) {
+  if (ws?.readyState === 1) ws.send(new TextEncoder().encode(seq));
+}
+// Toolbar: freeze focus state on touch, send key on release
+$('term-toolbar').addEventListener('touchstart', e => {
+  if (e.target.closest('.tb-btn')) e.preventDefault();
+}, { passive: false });
+
+function tbTap(id, seq) {
+  const el = $(id);
+  el.addEventListener('touchend', () => sendKey(seq));
+  el.addEventListener('click', () => sendKey(seq)); // desktop
+}
+tbTap('key-esc',    '\x1b');
+tbTap('key-tab',    '\t');
+tbTap('key-ctrl-c', '\x03');
+
+// Keyboard on mobile: shrink app shell so keyboard doesn't cover terminal
+if (window.visualViewport) {
+  const appEl = document.querySelector('.app');
+  window.visualViewport.addEventListener('resize', () => {
+    // visualViewport.height shrinks when keyboard appears
+    const kbOffset = window.innerHeight - window.visualViewport.height;
+    appEl.style.bottom = kbOffset > 0
+      ? kbOffset + 'px'
+      : 'env(safe-area-inset-bottom, 0px)';
+    applyScale();
+    term?.scrollToBottom();
+  });
+}
 window.addEventListener('resize', applyScale);
+
+// ── Touch scroll for terminal (CSS scale breaks xterm.js internal scroll) ──
+// Attach to #term-wrap with capture:true so we intercept before xterm's handlers
+{
+  const wrap = $('term-wrap');
+  let startY = null, accum = 0, isSwiping = false;
+  const LINE_PX = 18;
+
+  wrap.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      startY = e.touches[0].clientY;
+      accum = 0;
+      isSwiping = false;
+    }
+  }, { passive: true, capture: true });
+
+  wrap.addEventListener('touchmove', e => {
+    if (startY === null || !term) return;
+    const dy = startY - e.touches[0].clientY;
+    accum += dy;
+    startY = e.touches[0].clientY;
+    const lines = Math.trunc(accum / LINE_PX);
+    if (lines !== 0) {
+      isSwiping = true;
+      term.scrollLines(lines);
+      accum -= lines * LINE_PX;
+    }
+    if (isSwiping) e.preventDefault();
+  }, { passive: false, capture: true });
+
+  wrap.addEventListener('touchend', () => { startY = null; }, { passive: true, capture: true });
+}
 
 poll();
 setInterval(poll, 3000);
