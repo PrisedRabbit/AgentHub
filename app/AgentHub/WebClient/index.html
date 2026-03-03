@@ -2,7 +2,10 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>AgentHub Web</title>
   <link rel="stylesheet" href="/xterm.css">
   <style>
@@ -28,10 +31,19 @@
       height: 100%; background: var(--bg); color: var(--text);
       font-family: 'IBM Plex Sans', system-ui, sans-serif;
       -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;        /* блокирует pull-to-refresh и rubber band */
+      overflow: hidden;
+      touch-action: none;               /* блокирует drag страницы */
     }
 
     /* ── App shell ───────────────────────────────────────────────────────── */
-    .app { display: flex; flex-direction: column; height: 100dvh; }
+    .app {
+      display: flex; flex-direction: column;
+      height: 100dvh;
+      height: -webkit-fill-available; /* Safari fallback */
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
 
     /* ── Topbar ──────────────────────────────────────────────────────────── */
     .topbar {
@@ -173,6 +185,13 @@
     /* Terminal scale wrapper */
     #term-scale-wrapper { transform-origin: top left; display: inline-block; }
 
+    /* Zoom level badge */
+    #zoom-level {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--muted); padding: 0 4px; flex-shrink: 0;
+      min-width: 32px; text-align: center; user-select: none;
+    }
+
     /* Zoom buttons */
     .zoom-btn {
       width: 26px; height: 26px; border-radius: 5px;
@@ -201,6 +220,11 @@
       .sessions-btn { display: flex; }
       .topbar-title { font-size: 13px; }
     }
+
+    /* Restore touch for scrollable areas */
+    .sidebar, .drawer-list { touch-action: pan-y; }
+    /* xterm canvas needs touch events for typing */
+    .xterm, .xterm-viewport, .xterm-screen, canvas { touch-action: auto; }
 
     /* ── Reduced motion ──────────────────────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
@@ -253,6 +277,7 @@
       <div class="terminal-titlebar">
         <div id="titlebar-content"><span style="color:var(--muted)">Select a session</span></div>
         <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" title="Zoom out (−)">−</button>
+        <span id="zoom-level">100%</span>
         <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
       </div>
       <div id="term-wrap">
@@ -507,14 +532,21 @@ function applyScale() {
   wrap.style.overflow = scale > 1 ? 'auto' : 'hidden';
 }
 
+function updateZoomBadge() {
+  $('zoom-level').textContent = Math.round(userZoom * 100) + '%';
+}
+updateZoomBadge();
+
 $('zoom-in').addEventListener('click', () => {
   userZoom = Math.min(MAX_ZOOM, parseFloat((userZoom + ZOOM_STEP).toFixed(2)));
   localStorage.setItem('ah-zoom', userZoom);
+  updateZoomBadge();
   applyScale();
 });
 $('zoom-out').addEventListener('click', () => {
   userZoom = Math.max(MIN_ZOOM, parseFloat((userZoom - ZOOM_STEP).toFixed(2)));
   localStorage.setItem('ah-zoom', userZoom);
+  updateZoomBadge();
   applyScale();
 });
 
