@@ -488,22 +488,25 @@ function applyScale() {
   const scaleEl = $('term-scale-wrapper');
   if (!wrap || !scaleEl) return;
 
-  const containerW = wrap.clientWidth - 8; // subtract padding
-  const core = term._core;
-  const cellW = core?._renderService?.dimensions?.actualCellWidth || 9;
-  const cellH = core?._renderService?.dimensions?.actualCellHeight || 18;
+  const cellW = term._core?._renderService?.dimensions?.actualCellWidth;
+  const cellH = term._core?._renderService?.dimensions?.actualCellHeight;
+  if (!cellW || !cellH) {
+    requestAnimationFrame(applyScale);
+    return;
+  }
+
+  const containerW = wrap.clientWidth - 8;
   const termW = term.cols * cellW;
   const termH = term.rows * cellH;
 
-  // Auto-scale: shrink to fit width (never upscale beyond 1.0 * userZoom)
   const autoFit = termW > 0 ? Math.min(1.0, containerW / termW) : 1.0;
   const scale = autoFit * userZoom;
 
   scaleEl.style.transform = `scale(${scale})`;
-  // Set wrapper height so it occupies correct space (transform doesn't affect layout)
   scaleEl.style.width  = termW + 'px';
   scaleEl.style.height = termH + 'px';
-  wrap.style.setProperty('--term-scale', scale);
+  // Allow scrolling when zoomed in beyond container bounds
+  wrap.style.overflow = scale > 1 ? 'auto' : 'hidden';
 }
 
 document.getElementById('zoom-in').addEventListener('click', () => {
