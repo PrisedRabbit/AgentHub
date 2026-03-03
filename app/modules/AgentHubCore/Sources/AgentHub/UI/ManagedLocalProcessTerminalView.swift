@@ -137,6 +137,14 @@ open class ManagedLocalProcessTerminalView: TerminalView, TerminalViewDelegate, 
     process.send(data: ArraySlice(data))
   }
 
+  /// Resize the PTY to the given dimensions and send SIGWINCH to the child process.
+  /// Called by web clients so the running app (e.g. Claude Code) redraws at the correct size.
+  public func resizePTY(cols: Int, rows: Int) {
+    guard process.running, process.childfd >= 0 else { return }
+    var size = winsize(ws_row: UInt16(rows), ws_col: UInt16(cols), ws_xpixel: 0, ws_ypixel: 0)
+    _ = PseudoTerminalHelpers.setWinSize(masterPtyDescriptor: process.childfd, windowSize: &size)
+  }
+
   open func getWindowSize() -> winsize {
     let f: CGRect = frame
     return winsize(

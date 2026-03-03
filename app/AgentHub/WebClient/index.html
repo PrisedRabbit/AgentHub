@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -7,70 +7,217 @@
   <link rel="stylesheet" href="/xterm.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Themes ─────────────────────────────────────────────────────────── */
     :root {
       --bg: #0F172A; --panel: #1E293B; --border: #334155;
       --accent: #22C55E; --text: #F8FAFC; --muted: #94A3B8;
+      --overlay: rgba(0,0,0,.55); --shadow: 0 8px 32px rgba(0,0,0,.5);
+      --term-bg: #0F172A;
     }
-    html, body { height: 100%; background: var(--bg); color: var(--text);
-      font-family: 'IBM Plex Sans', system-ui, sans-serif; overflow: hidden; }
-    .app { display: flex; flex-direction: column; height: 100vh; }
-    /* Topbar */
-    .topbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px;
-      border-bottom: 1px solid var(--border); background: var(--panel); flex-shrink: 0; }
-    .topbar-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
-      transition: background 300ms; flex-shrink: 0; }
+    [data-theme="light"] {
+      --bg: #F1F5F9; --panel: #FFFFFF; --border: #E2E8F0;
+      --accent: #16A34A; --text: #0F172A; --muted: #64748B;
+      --overlay: rgba(0,0,0,.3); --shadow: 0 8px 32px rgba(0,0,0,.15);
+      --term-bg: #FAFAFA;
+    }
+
+    html, body {
+      height: 100%; background: var(--bg); color: var(--text);
+      font-family: 'Fira Sans', system-ui, sans-serif;
+      overflow: hidden; -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── App shell ───────────────────────────────────────────────────────── */
+    .app { display: flex; flex-direction: column; height: 100dvh; }
+
+    /* ── Topbar ──────────────────────────────────────────────────────────── */
+    .topbar {
+      display: flex; align-items: center; gap: 10px; padding: 0 16px;
+      height: 52px; border-bottom: 1px solid var(--border);
+      background: var(--panel); flex-shrink: 0;
+    }
+    .topbar-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
+      transition: background 300ms; flex-shrink: 0;
+    }
     .topbar-dot.connected { background: var(--accent); }
-    .topbar-title { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; }
-    .topbar-status { font-size: 12px; color: var(--muted); margin-left: auto; }
-    /* Main layout */
+    .topbar-title {
+      font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 600;
+    }
+    .topbar-status { font-size: 12px; color: var(--muted); }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+
+    /* ── Icon buttons ────────────────────────────────────────────────────── */
+    .icon-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 8px; border: none;
+      background: transparent; color: var(--muted); cursor: pointer;
+      transition: background 150ms, color 150ms; flex-shrink: 0;
+      touch-action: manipulation;
+    }
+    .icon-btn:hover { background: rgba(128,128,128,.1); color: var(--text); }
+    .icon-btn:active { background: rgba(128,128,128,.2); }
+    .sessions-btn { display: none; }
+
+    /* ── Main layout ─────────────────────────────────────────────────────── */
     .main { display: flex; flex: 1; overflow: hidden; }
-    /* Sidebar */
-    .sidebar { width: 200px; flex-shrink: 0; border-right: 1px solid var(--border);
-      overflow-y: auto; background: var(--panel); display: flex; flex-direction: column; }
-    .sidebar-header { padding: 12px 14px 6px; font-size: 10px; font-weight: 600;
-      letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-    .session-item { display: flex; align-items: center; gap: 8px; padding: 9px 14px;
-      cursor: pointer; border-left: 2px solid transparent; transition: background 150ms, border-color 150ms; }
-    .session-item:hover { background: rgba(255,255,255,.04); }
-    .session-item.active { background: rgba(34,197,94,.08); border-left-color: var(--accent); }
-    .session-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────────── */
+    .sidebar {
+      width: 220px; flex-shrink: 0; border-right: 1px solid var(--border);
+      overflow-y: auto; background: var(--panel);
+      display: flex; flex-direction: column;
+      overscroll-behavior: contain;
+    }
+    .sidebar-header {
+      padding: 12px 14px 6px; font-size: 10px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    /* ── Session items ───────────────────────────────────────────────────── */
+    .session-item {
+      display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+      cursor: pointer; border-left: 2px solid transparent;
+      transition: background 150ms, border-color 150ms;
+      min-height: 44px; touch-action: manipulation;
+    }
+    .session-item:hover { background: rgba(128,128,128,.06); }
+    .session-item.active { background: rgba(34,197,94,.07); border-left-color: var(--accent); }
+    [data-theme="light"] .session-item:hover { background: rgba(0,0,0,.04); }
+    .session-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--muted); flex-shrink: 0; margin-top: 5px;
+    }
     .session-dot.active { background: var(--accent); }
-    .session-info { min-width: 0; }
-    .session-name { font-size: 13px; font-weight: 500;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .session-meta { font-size: 11px; color: var(--muted);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .session-status { font-size: 10px; color: var(--accent); margin-top: 1px; }
-    .sidebar-empty { padding: 16px 14px; font-size: 13px; color: var(--muted); line-height: 1.6; }
-    /* Terminal area */
+    .session-info { min-width: 0; flex: 1; }
+    .session-name {
+      font-size: 13px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .session-folder {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-family: 'Fira Code', monospace;
+    }
+    .session-branch {
+      font-size: 10px; color: var(--muted); margin-top: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .session-status { font-size: 10px; color: var(--accent); margin-top: 2px; }
+    .sidebar-empty {
+      padding: 20px 14px; font-size: 13px; color: var(--muted); line-height: 1.6;
+    }
+
+    /* ── Mobile drawer ───────────────────────────────────────────────────── */
+    .drawer-overlay {
+      position: fixed; inset: 0;
+      background: var(--overlay); z-index: 40;
+      opacity: 0; transition: opacity 200ms;
+      pointer-events: none; display: none;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: auto; display: block; }
+    .drawer {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+      background: var(--panel); border-radius: 16px 16px 0 0;
+      border-top: 1px solid var(--border);
+      max-height: 72dvh; display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 260ms cubic-bezier(.32,.72,0,1);
+      box-shadow: var(--shadow);
+    }
+    .drawer.open { transform: translateY(0); }
+    .drawer-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--border); margin: 12px auto 8px; flex-shrink: 0;
+    }
+    .drawer-header {
+      padding: 0 16px 8px; font-size: 10px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+      flex-shrink: 0;
+    }
+    .drawer-list {
+      overflow-y: auto; flex: 1; overscroll-behavior: contain;
+      padding-bottom: env(safe-area-inset-bottom, 8px);
+    }
+
+    /* ── Terminal area ───────────────────────────────────────────────────── */
     .terminal-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-    .terminal-titlebar { padding: 9px 16px; border-bottom: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted);
-      background: var(--panel); flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .terminal-titlebar b { color: var(--text); font-weight: 500; }
-    #term-wrap { flex: 1; overflow: hidden; padding: 4px; background: var(--bg); }
-    .placeholder { display: flex; align-items: center; justify-content: center;
-      height: 100%; flex-direction: column; gap: 10px; }
-    .placeholder svg { opacity: .15; }
+    .terminal-titlebar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 16px; height: 38px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'Fira Code', monospace; font-size: 12px;
+      background: var(--panel); flex-shrink: 0;
+      overflow: hidden;
+    }
+    .terminal-titlebar b { color: var(--text); font-weight: 500; white-space: nowrap; }
+    .title-sep { color: var(--border); flex-shrink: 0; }
+    .title-folder { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #term-wrap { flex: 1; overflow: hidden; padding: 4px; background: var(--term-bg); }
+    .placeholder {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; flex-direction: column; gap: 10px;
+    }
+    .placeholder svg { opacity: .12; color: var(--text); }
     .placeholder p { color: var(--muted); font-size: 14px; }
+
+    /* ── Mobile overrides ────────────────────────────────────────────────── */
+    @media (max-width: 767px) {
+      .sidebar { display: none; }
+      .sessions-btn { display: flex; }
+      .topbar-title { font-size: 13px; }
+    }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="app">
   <header class="topbar">
     <div class="topbar-dot" id="dot"></div>
-    <span class="topbar-title">AgentHub Web</span>
+    <span class="topbar-title">AgentHub</span>
     <span class="topbar-status" id="status">Connecting…</span>
+    <div class="topbar-right">
+      <!-- Theme toggle -->
+      <button class="icon-btn" id="theme-btn" aria-label="Toggle theme" title="Toggle theme">
+        <!-- Sun (shown in dark mode) -->
+        <svg id="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
+          <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+          <line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/>
+          <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+        </svg>
+        <!-- Moon (shown in light mode) -->
+        <svg id="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="display:none">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+      <!-- Sessions button (mobile only) -->
+      <button class="icon-btn sessions-btn" id="sessions-btn" aria-label="Open sessions">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+      </button>
+    </div>
   </header>
+
   <div class="main">
-    <nav class="sidebar">
+    <nav class="sidebar" aria-label="Sessions">
       <div class="sidebar-header">Focused Sessions</div>
       <div id="session-list"></div>
     </nav>
+
     <div class="terminal-area">
-      <div class="terminal-titlebar" id="titlebar">Select a session</div>
+      <div class="terminal-titlebar" id="titlebar">
+        <span style="color:var(--muted)">Select a session</span>
+      </div>
       <div id="term-wrap">
         <div class="placeholder" id="placeholder">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -83,19 +230,106 @@
     </div>
   </div>
 </div>
+
+<!-- Mobile drawer -->
+<div class="drawer-overlay" id="drawer-overlay"></div>
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Sessions">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">Focused Sessions</div>
+  <div class="drawer-list" id="drawer-list"></div>
+</div>
+
 <script src="/xterm.js"></script>
 <script>
 'use strict';
 let sessions = [], activeId = null, term = null, ws = null;
 const $ = id => document.getElementById(id);
 
-// ── Session polling ─────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────
+
+const storedTheme = localStorage.getItem('ah-theme') ||
+  (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+applyTheme(storedTheme, false);
+
+function applyTheme(t, updateTerm = true) {
+  document.documentElement.setAttribute('data-theme', t);
+  $('icon-sun').style.display  = t === 'dark'  ? 'block' : 'none';
+  $('icon-moon').style.display = t === 'light' ? 'block' : 'none';
+  localStorage.setItem('ah-theme', t);
+  if (updateTerm && term) {
+    term.options.theme = xtermTheme(t);
+    $('term-wrap').style.background = t === 'dark' ? '#0F172A' : '#FAFAFA';
+  }
+}
+
+function xtermTheme(t) {
+  return t === 'dark' ? {
+    background: '#0F172A', foreground: '#F8FAFC', cursor: '#22C55E',
+    cursorAccent: '#0F172A', selectionBackground: '#334155',
+    black: '#1E293B', brightBlack: '#475569',
+    red: '#F87171',   brightRed: '#FCA5A5',
+    green: '#22C55E', brightGreen: '#4ADE80',
+    yellow: '#FACC15',brightYellow: '#FDE047',
+    blue: '#60A5FA',  brightBlue: '#93C5FD',
+    magenta: '#C084FC',brightMagenta: '#D8B4FE',
+    cyan: '#22D3EE',  brightCyan: '#67E8F9',
+    white: '#CBD5E1', brightWhite: '#F8FAFC',
+  } : {
+    background: '#FAFAFA', foreground: '#1E293B', cursor: '#16A34A',
+    cursorAccent: '#FFFFFF', selectionBackground: '#CBD5E1',
+    black: '#334155', brightBlack: '#64748B',
+    red: '#DC2626',   brightRed: '#EF4444',
+    green: '#16A34A', brightGreen: '#22C55E',
+    yellow: '#B45309',brightYellow: '#D97706',
+    blue: '#2563EB',  brightBlue: '#3B82F6',
+    magenta: '#7C3AED',brightMagenta: '#8B5CF6',
+    cyan: '#0E7490',  brightCyan: '#06B6D4',
+    white: '#475569', brightWhite: '#0F172A',
+  };
+}
+
+$('theme-btn').addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+
+// ── Mobile drawer ─────────────────────────────────────────────────────────
+
+function openDrawer() {
+  $('drawer-overlay').classList.add('open');
+  $('drawer').classList.add('open');
+}
+function closeDrawer() {
+  $('drawer-overlay').classList.remove('open');
+  $('drawer').classList.remove('open');
+}
+$('sessions-btn').addEventListener('click', openDrawer);
+$('drawer-overlay').addEventListener('click', closeDrawer);
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function shortPath(p) {
+  if (!p) return '';
+  const parts = String(p).replace(/\/$/, '').split('/').filter(Boolean);
+  if (parts.length === 0) return p;
+  return parts.length > 2 ? '…/' + parts.slice(-2).join('/') : parts.join('/');
+}
+
+// ── Session polling ───────────────────────────────────────────────────────
+
 async function poll() {
   try {
     const r = await fetch('/api/sessions');
     if (!r.ok) throw new Error(r.status);
     sessions = await r.json();
     renderSidebar();
+    syncTitlebar();
     $('dot').classList.add('connected');
     $('status').textContent = `${sessions.length} session${sessions.length !== 1 ? 's' : ''} · :${location.port}`;
   } catch {
@@ -104,55 +338,74 @@ async function poll() {
   }
 }
 
-// ── Sidebar ─────────────────────────────────────────────────────────────────
-function renderSidebar() {
-  const el = $('session-list');
-  if (!sessions.length) {
-    el.innerHTML = '<div class="sidebar-empty">No focused sessions.<br>Add sessions in AgentHub first.</div>';
-    return;
-  }
-  el.innerHTML = sessions.map(s => `
-    <div class="session-item${s.id === activeId ? ' active' : ''}"
-         onclick="connect('${esc(s.id)}')" title="${esc(s.projectPath)}">
-      <div class="session-dot${s.id === activeId ? ' active' : ''}"></div>
+// ── Sidebar rendering ─────────────────────────────────────────────────────
+
+function sessionItemHTML(s) {
+  const isActive = s.id === activeId;
+  return `
+    <div class="session-item${isActive ? ' active' : ''}"
+         onclick="connectAndClose('${esc(s.id)}')"
+         title="${esc(s.projectPath)}">
+      <div class="session-dot${isActive ? ' active' : ''}"></div>
       <div class="session-info">
         <div class="session-name">${esc(s.slug)}</div>
-        ${s.branchName ? `<div class="session-meta">${esc(s.branchName)}</div>` : ''}
+        <div class="session-folder">${esc(shortPath(s.projectPath))}</div>
+        ${s.branchName ? `<div class="session-branch">${esc(s.branchName)}</div>` : ''}
         <div class="session-status">${esc(s.statusLabel)}</div>
       </div>
-    </div>`).join('');
+    </div>`;
 }
 
-// ── Terminal ─────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const empty = '<div class="sidebar-empty">No focused sessions.<br>Add sessions in AgentHub first.</div>';
+  const html = sessions.length ? sessions.map(sessionItemHTML).join('') : empty;
+  $('session-list').innerHTML = html;
+  $('drawer-list').innerHTML = html;
+}
+
+function connectAndClose(id) {
+  closeDrawer();
+  connect(id);
+}
+
+// ── Titlebar sync (called on every poll) ──────────────────────────────────
+
+function syncTitlebar() {
+  if (!activeId) return;
+  const s = sessions.find(x => x.id === activeId);
+  if (!s) return;
+  setTitlebar(s);
+}
+
+function setTitlebar(s) {
+  const folder = shortPath(s.projectPath);
+  const branch = s.branchName ? ` [${esc(s.branchName)}]` : '';
+  $('titlebar').innerHTML =
+    `<b>${esc(s.slug)}</b><span class="title-sep">·</span><span class="title-folder">${esc(folder)}${branch}</span>`;
+}
+
+// ── Terminal ──────────────────────────────────────────────────────────────
+
 function connect(id) {
   if (ws) { ws.close(); ws = null; }
   activeId = id;
   renderSidebar();
 
   const s = sessions.find(x => x.id === id);
-  $('titlebar').innerHTML = s
-    ? `<b>${esc(s.slug)}</b> · ${esc(s.projectPath)}${s.branchName ? ' [' + esc(s.branchName) + ']' : ''}`
-    : esc(id);
+  if (s) setTitlebar(s);
+  else $('titlebar').innerHTML = `<b>${esc(id)}</b>`;
 
-  // Create terminal
+  const placeholder = $('placeholder');
+  if (placeholder) placeholder.style.display = 'none';
+
   if (term) { term.dispose(); }
   $('term-wrap').innerHTML = '';
-  $('placeholder') && ($('placeholder').style.display = 'none');
+
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
   term = new Terminal({
-    fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+    fontFamily: '"Fira Code", "JetBrains Mono", "Fira Mono", monospace',
     fontSize: 14, lineHeight: 1.2, cursorBlink: true, scrollback: 5000,
-    theme: {
-      background: '#0F172A', foreground: '#F8FAFC', cursor: '#22C55E',
-      selectionBackground: '#334155',
-      black: '#1E293B', brightBlack: '#475569',
-      red: '#F87171',   brightRed: '#FCA5A5',
-      green: '#22C55E', brightGreen: '#4ADE80',
-      yellow: '#FACC15',brightYellow: '#FDE047',
-      blue: '#60A5FA',  brightBlue: '#93C5FD',
-      magenta: '#C084FC',brightMagenta: '#D8B4FE',
-      cyan: '#22D3EE',  brightCyan: '#67E8F9',
-      white: '#CBD5E1', brightWhite: '#F8FAFC',
-    }
+    theme: xtermTheme(theme),
   });
   term.open($('term-wrap'));
   fit();
@@ -163,7 +416,6 @@ function connect(id) {
   term.onData(d => ws?.readyState === 1 && ws.send(new TextEncoder().encode(d)));
   term.writeln('\x1b[32mConnecting…\x1b[0m');
 
-  // WebSocket
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}/ws/terminal/${id}`);
   ws.binaryType = 'arraybuffer';
@@ -173,7 +425,8 @@ function connect(id) {
   ws.onerror = () => term?.writeln('\r\n\x1b[31m[Connection error]\x1b[0m');
 }
 
-// ── Fit terminal to container ─────────────────────────────────────────────────
+// ── Fit terminal ──────────────────────────────────────────────────────────
+
 function fit() {
   if (!term) return;
   const wrap = $('term-wrap');
@@ -186,10 +439,6 @@ function fit() {
     term.resize(cols, rows);
     ws?.readyState === 1 && ws.send(JSON.stringify({ type: 'resize', cols, rows }));
   }
-}
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 poll();

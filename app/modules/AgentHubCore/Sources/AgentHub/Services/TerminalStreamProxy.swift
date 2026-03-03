@@ -21,11 +21,15 @@ public final class TerminalStreamProxy {
   private var cancellables: [String: AnyCancellable] = [:]
   // sessionId → list of WebSocket listeners
   private var listeners: [String: [any TerminalListener]] = [:]
+  // sessionId → recent PTY bytes for replaying to newly connected clients
+  private var scrollbackBuffers: [String: Data] = [:]
+  private let maxScrollbackSize = 512 * 1024  // 512 KB
 
   // MARK: - Registration (called by EmbeddedTerminalView on appear/disappear)
 
   public func register(sessionId: String, terminal: ManagedLocalProcessTerminalView) {
     terminals[sessionId] = WeakTerminalRef(terminal)
+    scrollbackBuffers.removeValue(forKey: sessionId)  // Clear stale scrollback from previous run
     // Subscribe to PTY output and broadcast to all listeners for this session
     cancellables[sessionId] = terminal.dataPublisher
       .receive(on: DispatchQueue.global(qos: .userInteractive))
@@ -39,6 +43,7 @@ public final class TerminalStreamProxy {
   public func unregister(sessionId: String) {
     cancellables.removeValue(forKey: sessionId)
     terminals.removeValue(forKey: sessionId)
+    scrollbackBuffers.removeValue(forKey: sessionId)
     // Notify listeners the session ended
     listeners[sessionId]?.forEach { $0.onClose() }
     listeners.removeValue(forKey: sessionId)
@@ -47,6 +52,10 @@ public final class TerminalStreamProxy {
   // MARK: - Listener management (called by AgentHubWebServer)
 
   public func addListener(_ listener: any TerminalListener, for sessionId: String) {
+    // Replay scrollback so the new client sees existing terminal state
+    if let scrollback = scrollbackBuffers[sessionId], !scrollback.isEmpty {
+      listener.onData(scrollback)
+    }
     listeners[sessionId, default: []].append(listener)
   }
 
@@ -57,6 +66,14 @@ public final class TerminalStreamProxy {
   // MARK: - Data flow
 
   private func broadcast(sessionId: String, data: Data) {
+    // Append to scrollback buffer, trimming if over limit
+    var buffer = scrollbackBuffers[sessionId] ?? Data()
+    buffer.append(data)
+    if buffer.count > maxScrollbackSize {
+      buffer = Data(buffer.suffix(maxScrollbackSize))
+    }
+    scrollbackBuffers[sessionId] = buffer
+
     listeners[sessionId]?.forEach { $0.onData(data) }
   }
 
@@ -65,8 +82,7 @@ public final class TerminalStreamProxy {
   }
 
   public func resize(sessionId: String, cols: Int, rows: Int) {
-    // Terminal resize from web client — placeholder for MVP.
-    // Full implementation: call setTerminalSize on the terminal view.
+    terminals[sessionId]?.value?.resizePTY(cols: cols, rows: rows)
   }
 
   // MARK: - Inspection
