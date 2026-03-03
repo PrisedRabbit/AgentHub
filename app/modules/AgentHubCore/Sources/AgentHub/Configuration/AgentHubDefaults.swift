@@ -130,7 +130,7 @@ public enum AgentHubDefaults {
 
   // MARK: - Web Server Settings
 
-  /// Whether the built-in web server is enabled. Type: Bool (default: true)
+  /// Whether the built-in web server is enabled. Type: Bool (default: false)
   public static let webServerEnabled = "\(keyPrefix)webServer.enabled"
 
   /// Web server listen port. Type: Int (default: 8080)

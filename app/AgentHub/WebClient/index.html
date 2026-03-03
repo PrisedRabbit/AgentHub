@@ -193,9 +193,9 @@
     /* Terminal scale wrapper */
     #term-scale-wrapper { transform-origin: top left; display: inline-block; }
 
-    /* ── Bottom toolbar ──────────────────────────────────────────────────── */
+    /* ── Bottom toolbar (mobile only) ─────────────────────────────────────── */
     .term-toolbar {
-      display: flex; align-items: center; gap: 4px;
+      display: none; align-items: center; gap: 4px;
       padding: 4px 8px; height: 40px;
       border-top: 1px solid var(--border);
       background: var(--panel); flex-shrink: 0;
@@ -239,6 +239,7 @@
       .sidebar { display: none; }
       .sessions-btn { display: flex; }
       .topbar-title { font-size: 13px; }
+      .term-toolbar { display: flex; }
     }
 
     /* Scrollable lists */
@@ -412,6 +413,8 @@ function shortPath(p) {
 
 // ── Session polling ───────────────────────────────────────────────────────
 
+let initialConnectDone = false;
+
 async function poll() {
   try {
     const r = await fetch('/api/sessions');
@@ -421,6 +424,11 @@ async function poll() {
     syncTitlebar();
     $('dot').classList.add('connected');
     $('status').textContent = `${sessions.length} session${sessions.length !== 1 ? 's' : ''} · :${location.port}`;
+    if (!initialConnectDone) {
+      initialConnectDone = true;
+      const hashId = location.hash.slice(1);
+      if (hashId && sessions.find(s => s.id === hashId)) connect(hashId);
+    }
   } catch {
     $('dot').classList.remove('connected');
     $('status').textContent = 'Disconnected';
@@ -478,6 +486,7 @@ function setTitlebar(s) {
 function connect(id) {
   if (ws) { ws.close(); ws = null; }
   activeId = id;
+  history.replaceState(null, '', '#' + id);
   renderSidebar();
 
   const s = sessions.find(x => x.id === id);
@@ -530,6 +539,7 @@ function connect(id) {
 // ── Scale terminal to fit container ───────────────────────────────────────
 
 const MIN_ZOOM = 30, MAX_ZOOM = 250, ZOOM_STEP = 10; // integer percentages
+const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
 let userZoomPct = parseInt(localStorage.getItem('ah-zoom-pct') || '180', 10);
 
 function applyScale() {
@@ -563,9 +573,10 @@ function doScale(wrap, outer, scaleEl, cellW, cellH) {
   const termW = term.cols * cellW;
   const termH = term.rows * cellH;
 
-  // Auto-fit to container width, then apply user zoom multiplier
-  const autoFit = termW > 0 ? Math.min(1.0, containerW / termW) : 1.0;
-  const scale = autoFit * (userZoomPct / 100);
+  // Desktop: always 1:1. Mobile: auto-fit width + user zoom multiplier.
+  const mobile = isMobile();
+  const autoFit = mobile && termW > 0 ? Math.min(1.0, containerW / termW) : 1.0;
+  const scale = mobile ? autoFit * (userZoomPct / 100) : 1.0;
 
   scaleEl.style.transform = `scale(${scale})`;
   scaleEl.style.width  = termW + 'px';

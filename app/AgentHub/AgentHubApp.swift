@@ -25,7 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     // Note: We intentionally do NOT clean up orphaned processes here
     // because we can't distinguish between processes spawned by AgentHub
     // vs processes the user started directly in Terminal.app
-    let webEnabled = UserDefaults.standard.object(forKey: AgentHubDefaults.webServerEnabled) as? Bool ?? true
+    let webEnabled = UserDefaults.standard.object(forKey: AgentHubDefaults.webServerEnabled) as? Bool ?? false
     if webEnabled {
       Task {
         try? await provider.webServer.start()
