@@ -23,6 +23,8 @@ public final class TerminalStreamProxy {
   private var listeners: [String: [any TerminalListener]] = [:]
   // sessionId → recent PTY bytes for replaying to newly connected clients
   private var scrollbackBuffers: [String: Data] = [:]
+  // sessionId → current PTY dimensions, sent to newly connecting web clients
+  private var currentSizes: [String: (cols: Int, rows: Int)] = [:]
   private let maxScrollbackSize = 512 * 1024  // 512 KB
 
   // MARK: - Registration (called by EmbeddedTerminalView on appear/disappear)
@@ -44,6 +46,7 @@ public final class TerminalStreamProxy {
     cancellables.removeValue(forKey: sessionId)
     terminals.removeValue(forKey: sessionId)
     scrollbackBuffers.removeValue(forKey: sessionId)
+    currentSizes.removeValue(forKey: sessionId)
     // Notify listeners the session ended
     listeners[sessionId]?.forEach { $0.onClose() }
     listeners.removeValue(forKey: sessionId)
@@ -52,6 +55,10 @@ public final class TerminalStreamProxy {
   // MARK: - Listener management (called by AgentHubWebServer)
 
   public func addListener(_ listener: any TerminalListener, for sessionId: String) {
+    // Send current terminal size so xterm.js initializes at the correct dimensions
+    if let size = currentSizes[sessionId] {
+      listener.onResize(cols: size.cols, rows: size.rows)
+    }
     // Replay scrollback so the new client sees existing terminal state
     if let scrollback = scrollbackBuffers[sessionId], !scrollback.isEmpty {
       listener.onData(scrollback)
@@ -75,6 +82,11 @@ public final class TerminalStreamProxy {
     scrollbackBuffers[sessionId] = buffer
 
     listeners[sessionId]?.forEach { $0.onData(data) }
+  }
+
+  public func broadcastResize(sessionId: String, cols: Int, rows: Int) {
+    currentSizes[sessionId] = (cols: cols, rows: rows)
+    listeners[sessionId]?.forEach { $0.onResize(cols: cols, rows: rows) }
   }
 
   public func writeInput(sessionId: String, data: Data) {
