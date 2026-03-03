@@ -103,5 +103,6 @@ private final class WeakTerminalRef {
 /// `AnyObject` constraint required for `removeAll { $0 === listener }` identity comparison.
 public protocol TerminalListener: AnyObject {
   func onData(_ data: Data)
+  func onResize(cols: Int, rows: Int)
   func onClose()
 }

@@ -298,6 +298,11 @@ final class WebSocketClientSession: TerminalListener, @unchecked Sendable {
     sendFrame(payload: data, opcode: 0x02) // binary frame
   }
 
+  func onResize(cols: Int, rows: Int) {
+    let json = "{\"type\":\"resize\",\"cols\":\(cols),\"rows\":\(rows)}"
+    sendFrame(payload: Data(json.utf8), opcode: 0x01) // text frame
+  }
+
   func onClose() {
     sendFrame(payload: Data(), opcode: 0x08) // close frame
     connection.cancel()
