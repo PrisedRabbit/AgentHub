@@ -20,6 +20,12 @@ public struct SettingsView: View {
   @AppStorage(AgentHubDefaults.terminalFontName)
   private var terminalFontName: String = "SF Mono"
 
+  @AppStorage(AgentHubDefaults.webServerEnabled)
+  private var webServerEnabled: Bool = false
+
+  @AppStorage(AgentHubDefaults.webServerPort)
+  private var webServerPort: Int = 8080
+
   @AppStorage(AgentHubDefaults.notificationSoundsEnabled)
   private var notificationSoundsEnabled: Bool = true
 
@@ -226,6 +232,53 @@ public struct SettingsView: View {
   private var appearanceTab: some View {
     Form {
       Section {
+        Toggle(isOn: $webServerEnabled) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Web terminal")
+            Text("Stream terminal sessions to a browser")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+
+        Stepper(value: $webServerPort, in: 1024...65535, step: 1) {
+          HStack {
+            Text("Port")
+            Spacer()
+            Text("\(webServerPort)")
+              .foregroundColor(.secondary)
+              .monospacedDigit()
+          }
+        }
+        .disabled(!webServerEnabled)
+
+        if webServerEnabled {
+          let address = "http://\(localIPAddress()):\(webServerPort)"
+          HStack {
+            Text(address)
+              .font(.caption)
+              .foregroundColor(.secondary)
+              .textSelection(.enabled)
+            Spacer()
+            Button {
+              NSPasteboard.general.clearContents()
+              NSPasteboard.general.setString(address, forType: .string)
+            } label: {
+              Image(systemName: "doc.on.doc")
+                .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .help("Copy address")
+          }
+          Text("Restart app to apply changes")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+        }
+      } header: {
+        Text("Web Terminal")
+      }
+
+      Section {
         Picker("Theme", selection: themeSelectionBinding) {
           Text("Default").tag(defaultThemeId)
           ForEach(themeManager.availableYAMLThemes) { theme in
@@ -301,5 +354,22 @@ public struct SettingsView: View {
 
     selectedThemeId = defaultThemeId
     themeManager.loadBuiltInTheme(.claude)
+  }
+
+  private func localIPAddress() -> String {
+    var ifaddr: UnsafeMutablePointer<ifaddrs>?
+    guard getifaddrs(&ifaddr) == 0, let first = ifaddr else { return "localhost" }
+    defer { freeifaddrs(ifaddr) }
+    for ptr in sequence(first: first, next: { $0.pointee.ifa_next }) {
+      let sa = ptr.pointee.ifa_addr.pointee
+      guard sa.sa_family == UInt8(AF_INET) else { continue }
+      let name = String(cString: ptr.pointee.ifa_name)
+      guard name == "en0" || name == "en1" else { continue }
+      var addr = ptr.pointee.ifa_addr.pointee
+      var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+      getnameinfo(&addr, socklen_t(sa.sa_len), &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
+      return String(cString: hostname)
+    }
+    return "localhost"
   }
 }
