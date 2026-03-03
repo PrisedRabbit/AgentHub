@@ -132,7 +132,7 @@ function connect(id) {
   const s = sessions.find(x => x.id === id);
   $('titlebar').innerHTML = s
     ? `<b>${esc(s.slug)}</b> · ${esc(s.projectPath)}${s.branchName ? ' [' + esc(s.branchName) + ']' : ''}`
-    : id;
+    : esc(id);
 
   // Create terminal
   if (term) { term.dispose(); }
@@ -189,7 +189,7 @@ function fit() {
 }
 
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 poll();
