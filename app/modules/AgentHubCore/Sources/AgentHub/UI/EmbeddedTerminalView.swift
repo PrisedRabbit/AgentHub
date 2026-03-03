@@ -138,6 +138,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
 public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDelegate {
   var terminalView: SafeLocalProcessTerminalView?
   private var isConfigured = false
+  private var registeredSessionId: String?
   private var hasDeliveredInitialPrompt = false
   private var hasPrefilledInitialInputText = false
   private var terminalPidMap: [ObjectIdentifier: pid_t] = [:]
@@ -163,6 +164,13 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
   /// Call this before removing the terminal from activeTerminals to ensure cleanup.
   /// Safe to call multiple times - subsequent calls are no-ops.
   public func terminateProcess() {
+    // Unregister from web streaming proxy
+    if let sid = registeredSessionId {
+      registeredSessionId = nil
+      Task { @MainActor in
+        TerminalStreamProxy.shared.unregister(sessionId: sid)
+      }
+    }
     // Stop data reception FIRST to prevent DispatchIO race condition crash
     terminalView?.stopReceivingData()
     terminalView?.terminateProcessTree()
@@ -230,6 +238,14 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
       worktreeName: worktreeName
     )
     registerProcessIfNeeded(for: terminal)
+
+    // Register with web streaming proxy
+    if let sid = sessionId {
+      registeredSessionId = sid
+      Task { @MainActor in
+        TerminalStreamProxy.shared.register(sessionId: sid, terminal: terminal)
+      }
+    }
 
     if let initialInputText, !initialInputText.isEmpty {
       Task { @MainActor [weak self] in
