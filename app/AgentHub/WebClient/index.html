@@ -156,7 +156,44 @@
     .terminal-titlebar b { color: var(--text); font-weight: 500; white-space: nowrap; }
     .title-sep { color: var(--border); flex-shrink: 0; }
     .title-folder { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #term-wrap { flex: 1; overflow: hidden; padding: 4px; background: var(--term-bg); }
+    #term-wrap { flex: 1; overflow: hidden; padding: 4px; background: var(--term-bg); position: relative; }
+
+    /* Terminal scale wrapper — CSS transform applies here */
+    #term-scale-wrapper {
+      transform-origin: top left;
+      display: inline-block;
+    }
+
+    /* Zoom control buttons */
+    #zoom-controls {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      gap: 4px;
+      z-index: 10;
+    }
+    .zoom-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 20px;
+      font-family: system-ui, sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      user-select: none;
+      opacity: 0.75;
+      transition: opacity 150ms, background 150ms;
+    }
+    .zoom-btn:hover { opacity: 1; background: var(--surface, rgba(128,128,128,.15)); }
+    .zoom-btn:active { background: rgba(128,128,128,.25); }
+
     .placeholder {
       display: flex; align-items: center; justify-content: center;
       height: 100%; flex-direction: column; gap: 10px;
@@ -219,6 +256,11 @@
         <span style="color:var(--muted)">Select a session</span>
       </div>
       <div id="term-wrap">
+        <div id="term-scale-wrapper"><div id="terminal"></div></div>
+        <div id="zoom-controls">
+          <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
+          <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
+        </div>
         <div class="placeholder" id="placeholder">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
             <rect x="2" y="4" width="20" height="16" rx="2"/>
@@ -399,7 +441,7 @@ function connect(id) {
   if (placeholder) placeholder.style.display = 'none';
 
   if (term) { term.dispose(); }
-  $('term-wrap').innerHTML = '';
+  $('terminal').innerHTML = '';
 
   const theme = document.documentElement.getAttribute('data-theme') || 'dark';
   term = new Terminal({
@@ -407,11 +449,7 @@ function connect(id) {
     fontSize: 14, lineHeight: 1.2, cursorBlink: true, scrollback: 5000,
     theme: xtermTheme(theme),
   });
-  term.open($('term-wrap'));
-  fit();
-
-  const ro = new ResizeObserver(fit);
-  ro.observe($('term-wrap'));
+  term.open($('terminal'));
 
   term.onData(d => ws?.readyState === 1 && ws.send(new TextEncoder().encode(d)));
   term.writeln('\x1b[32mConnecting…\x1b[0m');
@@ -419,27 +457,66 @@ function connect(id) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}/ws/terminal/${id}`);
   ws.binaryType = 'arraybuffer';
-  ws.onopen = fit;
-  ws.onmessage = e => term?.write(e.data instanceof ArrayBuffer ? new Uint8Array(e.data) : e.data);
+  ws.onopen = () => {};
+  ws.onmessage = (e) => {
+    if (typeof e.data === 'string') {
+      // JSON control message from server
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'resize') {
+          term.resize(msg.cols, msg.rows);
+          setTimeout(applyScale, 50);
+        }
+      } catch (_) {}
+    } else {
+      // Binary PTY data
+      term?.write(new Uint8Array(e.data));
+    }
+  };
   ws.onclose = () => term?.writeln('\r\n\x1b[33m[Disconnected]\x1b[0m');
   ws.onerror = () => term?.writeln('\r\n\x1b[31m[Connection error]\x1b[0m');
 }
 
-// ── Fit terminal ──────────────────────────────────────────────────────────
+// ── Scale terminal to fit container ───────────────────────────────────────
 
-function fit() {
+const MIN_ZOOM = 0.3, MAX_ZOOM = 2.5, ZOOM_STEP = 0.1;
+let userZoom = parseFloat(localStorage.getItem('ah-zoom') || '1.0');
+
+function applyScale() {
   if (!term) return;
   const wrap = $('term-wrap');
+  const scaleEl = $('term-scale-wrapper');
+  if (!wrap || !scaleEl) return;
+
+  const containerW = wrap.clientWidth - 8; // subtract padding
   const core = term._core;
-  const cw = core?._renderService?.dimensions?.actualCellWidth || 9;
-  const ch = core?._renderService?.dimensions?.actualCellHeight || 18;
-  const cols = Math.max(2, Math.floor((wrap.clientWidth  - 8) / cw));
-  const rows = Math.max(2, Math.floor((wrap.clientHeight - 8) / ch));
-  if (term.cols !== cols || term.rows !== rows) {
-    term.resize(cols, rows);
-    ws?.readyState === 1 && ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-  }
+  const cellW = core?._renderService?.dimensions?.actualCellWidth || 9;
+  const cellH = core?._renderService?.dimensions?.actualCellHeight || 18;
+  const termW = term.cols * cellW;
+  const termH = term.rows * cellH;
+
+  // Auto-scale: shrink to fit width (never upscale beyond 1.0 * userZoom)
+  const autoFit = termW > 0 ? Math.min(1.0, containerW / termW) : 1.0;
+  const scale = autoFit * userZoom;
+
+  scaleEl.style.transform = `scale(${scale})`;
+  // Set wrapper height so it occupies correct space (transform doesn't affect layout)
+  scaleEl.style.width  = termW + 'px';
+  scaleEl.style.height = termH + 'px';
+  wrap.style.setProperty('--term-scale', scale);
 }
+
+document.getElementById('zoom-in').addEventListener('click', () => {
+  userZoom = Math.min(MAX_ZOOM, parseFloat((userZoom + ZOOM_STEP).toFixed(2)));
+  localStorage.setItem('ah-zoom', userZoom);
+  applyScale();
+});
+document.getElementById('zoom-out').addEventListener('click', () => {
+  userZoom = Math.max(MIN_ZOOM, parseFloat((userZoom - ZOOM_STEP).toFixed(2)));
+  localStorage.setItem('ah-zoom', userZoom);
+  applyScale();
+});
+window.addEventListener('resize', applyScale);
 
 poll();
 setInterval(poll, 3000);
