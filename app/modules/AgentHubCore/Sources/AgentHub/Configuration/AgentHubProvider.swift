@@ -130,6 +130,25 @@ public final class AgentHubProvider {
     IntelligenceViewModel(claudeClient: claudeClient)
   }()
 
+  /// Embedded HTTP + WebSocket server for web terminal client
+  public private(set) lazy var webServer: AgentHubWebServer = {
+    let storedPort = UserDefaults.standard.integer(forKey: AgentHubDefaults.webServerPort)
+    let port = (1024...65535).contains(storedPort) ? UInt16(storedPort) : 8080
+    return AgentHubWebServer(port: port) { [weak self] in
+      guard let self else { return [] }
+      return await MainActor.run {
+        let vm = self.sessionsViewModel
+        return vm.monitoredSessions.map { pair in
+          WebSessionInfo(
+            session: pair.session,
+            state: pair.state,
+            hasTerminal: vm.sessionsWithTerminalView.contains(pair.session.id)
+          )
+        }
+      }
+    }
+  }()
+
   // MARK: - Initialization
 
   /// Creates a provider with the specified configuration
