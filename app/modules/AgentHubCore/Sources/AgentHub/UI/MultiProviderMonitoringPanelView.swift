@@ -18,6 +18,7 @@ private enum SidePanelContent: Equatable {
   case webPreview(sessionId: String, session: CLISession, projectPath: String)
   case mermaid(sessionId: String, session: CLISession)
   case simulator(sessionId: String, session: CLISession)
+  case fileExplorer(sessionId: String, session: CLISession, projectPath: String, initialFilePath: String?)
 
   static func == (lhs: SidePanelContent, rhs: SidePanelContent) -> Bool {
     switch (lhs, rhs) {
@@ -31,6 +32,8 @@ private enum SidePanelContent: Equatable {
       return id1 == id2
     case (.simulator(let id1, _), .simulator(let id2, _)):
       return id1 == id2
+    case (.fileExplorer(let id1, _, let p1, let fp1), .fileExplorer(let id2, _, let p2, let fp2)):
+      return id1 == id2 && p1 == p2 && fp1 == fp2
     default: return false
     }
   }
@@ -231,6 +234,9 @@ public struct MultiProviderMonitoringPanelView: View {
   private var previousLayoutModeRawValue: Int = -1
   @AppStorage(AgentHubDefaults.flatSessionLayout)
   private var flatSessionLayout: Bool = false
+  @AppStorage(AgentHubDefaults.fileExplorerAlwaysModal)
+  private var fileExplorerAlwaysModal: Bool = false
+  @State private var showQuickFilePicker = false
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.runtimeTheme) private var runtimeTheme
 
@@ -280,6 +286,32 @@ public struct MultiProviderMonitoringPanelView: View {
     }
     .background(monitorContainerBackgroundColor)
     .cornerRadius(8)
+    .overlay {
+      // Hidden Cmd+Shift+P trigger for QuickFilePicker
+      Button("") { showQuickFilePicker = true }
+        .keyboardShortcut("p", modifiers: [.command, .shift])
+        .frame(width: 0, height: 0)
+        .hidden()
+    }
+    .sheet(isPresented: $showQuickFilePicker) {
+      if let primaryItem = allItems.first(where: { $0.id == effectivePrimarySessionId }) {
+        QuickFilePickerView(
+          isPresented: $showQuickFilePicker,
+          projectPath: primaryItem.projectPath,
+          onFileSelected: { path in
+            showQuickFilePicker = false
+            if case .monitored(_, _, let session, _) = primaryItem {
+              sidePanelContent = .fileExplorer(
+                sessionId: session.id,
+                session: session,
+                projectPath: primaryItem.projectPath,
+                initialFilePath: path
+              )
+            }
+          }
+        )
+      }
+    }
     .sheet(item: $sessionFileSheetItem) { item in
       MonitoringSessionFileSheetView(
         session: item.session,
@@ -574,6 +606,14 @@ public struct MultiProviderMonitoringPanelView: View {
             onShowSimulator: canShowSidePanel ? { session in
               sidePanelContent = .simulator(sessionId: session.id, session: session)
             } : nil,
+            onShowFiles: (canShowSidePanel && !fileExplorerAlwaysModal) ? { session, projectPath in
+              sidePanelContent = .fileExplorer(
+                sessionId: session.id,
+                session: session,
+                projectPath: projectPath,
+                initialFilePath: nil
+              )
+            } : nil,
             onPromptConsumed: {
               viewModel.clearPendingPrompt(for: session.id)
             },
@@ -640,6 +680,14 @@ public struct MultiProviderMonitoringPanelView: View {
         session: session,
         onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { sidePanelContent = nil } },
         isEmbedded: true
+      )
+    case .fileExplorer(_, let session, let projectPath, let initialFilePath):
+      FileExplorerView(
+        session: session,
+        projectPath: projectPath,
+        onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { sidePanelContent = nil } },
+        isEmbedded: true,
+        initialFilePath: initialFilePath
       )
     }
   }
