@@ -137,6 +137,10 @@ public enum AgentHubDefaults {
   /// Type: Bool (default: false)
   public static let flatSessionLayout = "\(keyPrefix)hub.flatSessionLayout"
 
+  /// Whether to always show diff in a modal window instead of the side panel
+  /// Type: Bool (default: false)
+  public static let diffAlwaysModal = "\(keyPrefix)hub.diffAlwaysModal"
+
   // MARK: - Web Server Settings
 
   /// Whether the built-in web server is enabled. Type: Bool (default: false)
