@@ -128,6 +128,10 @@ public enum AgentHubDefaults {
   /// Type: Bool (default: false)
   public static let flatSessionLayout = "\(keyPrefix)hub.flatSessionLayout"
 
+  /// Whether file explorer always opens as a modal (never as side panel)
+  /// Type: Bool (default: false)
+  public static let fileExplorerAlwaysModal = "\(keyPrefix)features.fileExplorerAlwaysModal"
+
   // MARK: - Theme Settings
 
   /// Selected color theme name
