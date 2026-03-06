@@ -195,7 +195,7 @@ enum ProviderMonitoringItem: Identifiable {
     switch self {
     case .pending(_, _, let pending):
       return pending.startedAt
-    case .monitored(_, _, let session, let state):
+    case .monitored(_, _, let session, _):
       return session.lastActivityAt
     }
   }
