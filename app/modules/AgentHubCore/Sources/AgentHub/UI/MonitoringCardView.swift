@@ -43,6 +43,14 @@ private struct WebPreviewSheetItem: Identifiable {
   let projectPath: String
 }
 
+/// Identifiable wrapper for file explorer sheet
+private struct FileExplorerSheetItem: Identifiable {
+  let id = UUID()
+  let session: CLISession
+  let projectPath: String
+  let initialFilePath: String?
+}
+
 // MARK: - MonitoringCardView
 
 /// Card view for displaying a monitored session in the monitoring panel
@@ -72,6 +80,7 @@ public struct MonitoringCardView: View {
   let onShowWebPreview: ((CLISession, String) -> Void)?
   let onShowMermaid: ((CLISession) -> Void)?
   let onShowSimulator: ((CLISession) -> Void)?
+  let onShowFiles: ((CLISession, String) -> Void)?
   let onPromptConsumed: (() -> Void)?
   let onTerminalInteraction: (() -> Void)?
   let isMaximized: Bool
@@ -86,6 +95,7 @@ public struct MonitoringCardView: View {
   @State private var webPreviewSheetItem: WebPreviewSheetItem?
   @State private var mermaidSheetSession: CLISession?
   @State private var simulatorSheetSession: CLISession?
+  @State private var fileExplorerSheetItem: FileExplorerSheetItem?
   @State private var isDragging = false
   @State private var showingActionsPopover = false
   @State private var showingFilePicker = false
@@ -119,6 +129,7 @@ public struct MonitoringCardView: View {
     onShowWebPreview: ((CLISession, String) -> Void)? = nil,
     onShowMermaid: ((CLISession) -> Void)? = nil,
     onShowSimulator: ((CLISession) -> Void)? = nil,
+    onShowFiles: ((CLISession, String) -> Void)? = nil,
     onPromptConsumed: (() -> Void)? = nil,
     onTerminalInteraction: (() -> Void)? = nil,
     isMaximized: Bool = false,
@@ -152,6 +163,7 @@ public struct MonitoringCardView: View {
     self.onShowWebPreview = onShowWebPreview
     self.onShowMermaid = onShowMermaid
     self.onShowSimulator = onShowSimulator
+    self.onShowFiles = onShowFiles
     self.onPromptConsumed = onPromptConsumed
     self.onTerminalInteraction = onTerminalInteraction
     self.isMaximized = isMaximized
@@ -274,6 +286,15 @@ public struct MonitoringCardView: View {
           vm.showTerminalWithPrompt(for: session, prompt: "Fix this build error:\n\(error)")
           simulatorSheetSession = nil
         }
+      )
+    }
+    .sheet(item: $fileExplorerSheetItem) { item in
+      FileExplorerView(
+        session: item.session,
+        projectPath: item.projectPath,
+        onDismiss: { fileExplorerSheetItem = nil },
+        isEmbedded: false,
+        initialFilePath: item.initialFilePath
       )
     }
     .sheet(isPresented: $showingNameSheet) {
@@ -672,6 +693,33 @@ public struct MonitoringCardView: View {
         }
         .buttonStyle(.plain)
         .help("View git unstaged changes")
+
+        // Files button
+        Button(action: {
+          if let onShowFiles {
+            onShowFiles(session, session.projectPath)
+          } else {
+            fileExplorerSheetItem = FileExplorerSheetItem(
+              session: session,
+              projectPath: session.projectPath,
+              initialFilePath: nil
+            )
+          }
+        }) {
+          HStack(spacing: 4) {
+            Image(systemName: "folder")
+              .font(.caption2)
+            Text("Files")
+              .font(.caption2)
+          }
+          .foregroundColor(.secondary)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .background(Color.secondary.opacity(0.1))
+          .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+        .help("Browse Files (⇧⌘P to search)")
 
         // Web preview button (only visible for web projects)
         let framework = ProjectFramework.detect(at: session.projectPath)
