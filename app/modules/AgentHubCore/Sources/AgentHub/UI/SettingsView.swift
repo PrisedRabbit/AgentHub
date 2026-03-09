@@ -17,6 +17,9 @@ public struct SettingsView: View {
   @AppStorage(AgentHubDefaults.diffAlwaysModal)
   private var diffAlwaysModal: Bool = false
 
+  @AppStorage(AgentHubDefaults.fileExplorerAlwaysModal)
+  private var fileExplorerAlwaysModal: Bool = false
+
   @AppStorage(AgentHubDefaults.terminalFontSize)
   private var terminalFontSize: Double = 12
 
@@ -290,6 +293,35 @@ public struct SettingsView: View {
         }
       } header: {
         Text("Web Terminal")
+      }
+
+      Section {
+        Toggle(isOn: $flatSessionLayout) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Flat session layout")
+            Text("Show all sessions without per-repository sections")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+        Toggle(isOn: $diffAlwaysModal) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Diff always modal")
+            Text("Open diff view as a floating window instead of a side panel")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+        Toggle(isOn: $fileExplorerAlwaysModal) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("File explorer always modal")
+            Text("Open file explorer as a floating window instead of a side panel")
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+      } header: {
+        Text("Layout")
       }
 
       Section {

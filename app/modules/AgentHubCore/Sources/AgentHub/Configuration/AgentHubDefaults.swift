@@ -141,6 +141,10 @@ public enum AgentHubDefaults {
   /// Type: Bool (default: false)
   public static let diffAlwaysModal = "\(keyPrefix)hub.diffAlwaysModal"
 
+  /// Whether file explorer always opens as a modal (never as side panel)
+  /// Type: Bool (default: false)
+  public static let fileExplorerAlwaysModal = "\(keyPrefix)features.fileExplorerAlwaysModal"
+
   // MARK: - Web Server Settings
 
   /// Whether the built-in web server is enabled. Type: Bool (default: false)
