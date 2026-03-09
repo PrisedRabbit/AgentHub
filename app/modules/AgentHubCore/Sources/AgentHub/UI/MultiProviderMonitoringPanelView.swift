@@ -308,9 +308,9 @@ public struct MultiProviderMonitoringPanelView: View {
       }
     }
     .overlay {
-      // Hidden Cmd+Shift+P trigger for QuickFilePicker
+      // Hidden Shift+P trigger for QuickFilePicker
       Button("") { showQuickFilePicker = true }
-        .keyboardShortcut("p", modifiers: [.command, .shift])
+        .keyboardShortcut("p", modifiers: [.command])
         .frame(width: 0, height: 0)
         .hidden()
     }
