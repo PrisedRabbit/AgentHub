@@ -298,7 +298,7 @@ public struct FileExplorerView: View {
         Text("Select a file to view")
           .font(.callout)
           .foregroundColor(.secondary)
-        Text("Browse the file tree or use \(Image(systemName: "command"))  \(Image(systemName: "shift"))  P")
+        Text("Browse the file tree or use \(Image(systemName: "command"))  P")
           .font(.caption)
           .foregroundColor(.secondary.opacity(0.6))
       }
