@@ -328,3 +328,138 @@ struct WorktreeRowVisibilityTests {
     #expect(isWorktreeRowVisible(vm) == true)
   }
 }
+
+// MARK: - CLICommandConfiguration plan mode tests
+
+@Suite("CLICommandConfiguration.argumentsForSession — plan mode")
+struct CLICommandConfigurationPlanModeTests {
+
+  private let claude = CLICommandConfiguration.claudeDefault
+  private let codex  = CLICommandConfiguration.codexDefault
+
+  // MARK: Claude
+
+  @Test("Claude emits --permission-mode plan when permissionModePlan is true")
+  func claudePlanModeFlag() {
+    let args = claude.argumentsForSession(sessionId: nil, prompt: nil, permissionModePlan: true)
+    guard let idx = args.firstIndex(of: "--permission-mode") else {
+      Issue.record("Expected --permission-mode flag")
+      return
+    }
+    let valueIdx = args.index(after: idx)
+    #expect(valueIdx < args.endIndex)
+    #expect(args[valueIdx] == "plan")
+  }
+
+  @Test("Claude plan mode takes precedence over dangerouslySkipPermissions")
+  func claudePlanModePrecedence() {
+    let args = claude.argumentsForSession(
+      sessionId: nil,
+      prompt: nil,
+      dangerouslySkipPermissions: true,
+      permissionModePlan: true
+    )
+    #expect(args.contains("--permission-mode"))
+    #expect(!args.contains("--dangerously-skip-permissions"))
+  }
+
+  @Test("Claude does not emit --permission-mode when plan mode is off")
+  func claudeNoPlanModeByDefault() {
+    let args = claude.argumentsForSession(sessionId: nil, prompt: nil, permissionModePlan: false)
+    #expect(!args.contains("--permission-mode"))
+  }
+
+  @Test("Claude plan mode flag appears before prompt")
+  func claudePlanModeFlagBeforePrompt() {
+    let args = claude.argumentsForSession(sessionId: nil, prompt: "fix bug", permissionModePlan: true)
+    #expect(args.last == "fix bug")
+    #expect(args.contains("--permission-mode"))
+  }
+
+  // MARK: Codex
+
+  @Test("Codex emits no --ask-for-approval flag when permissionModePlan is true")
+  func codexNoApprovalFlagInPlanMode() {
+    let args = codex.argumentsForSession(sessionId: nil, prompt: nil, permissionModePlan: true)
+    #expect(!args.contains("--ask-for-approval"))
+  }
+
+  @Test("Codex with plan mode true and a prompt emits only the prompt")
+  func codexPlanModeWithPrompt() {
+    let args = codex.argumentsForSession(sessionId: nil, prompt: "do work", permissionModePlan: true)
+    #expect(args == ["do work"])
+  }
+
+  @Test("Codex with plan mode true and no prompt emits empty args")
+  func codexPlanModeNoPrompt() {
+    let args = codex.argumentsForSession(sessionId: nil, prompt: nil, permissionModePlan: true)
+    #expect(args.isEmpty)
+  }
+
+  @Test("Codex resume ignores permissionModePlan")
+  func codexResumeIgnoresPlanMode() {
+    let args = codex.argumentsForSession(
+      sessionId: "abc-123",
+      prompt: nil,
+      permissionModePlan: true
+    )
+    #expect(args.contains("resume"))
+    #expect(args.contains("abc-123"))
+    #expect(!args.contains("--ask-for-approval"))
+  }
+}
+
+// MARK: - MultiSessionLaunchViewModel plan mode tests
+
+@Suite("MultiSessionLaunchViewModel — plan mode")
+struct MultiSessionLaunchViewModelPlanModeTests {
+
+  /// Mirrors the condition in MultiSessionLaunchView:
+  ///   disabled: viewModel.isPlanModeEnabled
+  @MainActor
+  private func isCodexPillDisabled(_ vm: MultiSessionLaunchViewModel) -> Bool {
+    vm.isPlanModeEnabled
+  }
+
+  @Test("isPlanModeEnabled defaults to false")
+  @MainActor
+  func defaultsToFalse() {
+    let vm = makeViewModel()
+    #expect(vm.isPlanModeEnabled == false)
+  }
+
+  @Test("reset() clears isPlanModeEnabled")
+  @MainActor
+  func resetClearsPlanMode() {
+    let vm = makeViewModel()
+    vm.isPlanModeEnabled = true
+    vm.reset()
+    #expect(vm.isPlanModeEnabled == false)
+  }
+
+  @Test("Codex pill is not disabled when plan mode is off")
+  @MainActor
+  func codexPillEnabledByDefault() {
+    let vm = makeViewModel()
+    #expect(isCodexPillDisabled(vm) == false)
+  }
+
+  @Test("Codex pill is disabled when plan mode is on")
+  @MainActor
+  func codexPillDisabledInPlanMode() {
+    let vm = makeViewModel()
+    vm.isPlanModeEnabled = true
+    #expect(isCodexPillDisabled(vm) == true)
+  }
+
+  @Test("selectedProviders excludes Codex when Codex is deselected in plan mode")
+  @MainActor
+  func selectedProvidersExcludesCodexInPlanMode() {
+    let vm = makeViewModel()
+    vm.isPlanModeEnabled = true
+    vm.isCodexSelected = false   // UI enforces this via .onChange
+    vm.claudeMode = .enabled
+    #expect(!vm.selectedProviders.contains(.codex))
+    #expect(vm.selectedProviders.contains(.claude))
+  }
+}
