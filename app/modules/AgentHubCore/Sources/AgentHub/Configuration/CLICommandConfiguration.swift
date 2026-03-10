@@ -51,7 +51,8 @@ public struct CLICommandConfiguration: Codable, Sendable {
     sessionId: String?,
     prompt: String?,
     dangerouslySkipPermissions: Bool = false,
-    worktreeName: String? = nil
+    worktreeName: String? = nil,
+    permissionModePlan: Bool = false
   ) -> [String] {
     let prefix = subcommandArgs
 
@@ -63,7 +64,10 @@ public struct CLICommandConfiguration: Codable, Sendable {
 
       // Add flags only for NEW sessions (not resume)
       if isNewSession {
-        if dangerouslySkipPermissions {
+        if permissionModePlan {
+          // --permission-mode plan takes precedence; mutually exclusive with dangerously-skip-permissions
+          args += ["--permission-mode", "plan"]
+        } else if dangerouslySkipPermissions {
           args.append("--dangerously-skip-permissions")
         }
         if let name = worktreeName {
@@ -87,12 +91,13 @@ public struct CLICommandConfiguration: Codable, Sendable {
       return prefix + args
 
     case .codex:
-      // Codex doesn't support this flag
       if let sessionId, !sessionId.isEmpty, !sessionId.hasPrefix("pending-") {
         // Codex CLI resume: codex resume <SESSION_ID>
         return prefix + ["resume", sessionId]
       }
-      // Start a new Codex session with optional prompt as positional argument
+      // Start a new Codex session.
+      // NOTE: Codex plan mode (ModeKind::Plan) is TUI-only and cannot be activated
+      // via CLI flags. The UI layer disables the Codex pill when plan mode is on.
       if let prompt, !prompt.isEmpty {
         return prefix + [prompt]
       }

@@ -59,6 +59,7 @@ public struct MonitoringCardView: View {
   let terminalKey: String?  // Key for terminal storage (session ID or "pending-{pendingId}")
   let viewModel: CLISessionsViewModel?
   var dangerouslySkipPermissions: Bool = false
+  var permissionModePlan: Bool = false
   let worktreeName: String?
   let onToggleTerminal: (Bool) -> Void
   let onStopMonitoring: () -> Void
@@ -106,6 +107,7 @@ public struct MonitoringCardView: View {
     terminalKey: String? = nil,
     viewModel: CLISessionsViewModel? = nil,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil,
     onToggleTerminal: @escaping (Bool) -> Void,
     onStopMonitoring: @escaping () -> Void,
@@ -139,6 +141,7 @@ public struct MonitoringCardView: View {
     self.terminalKey = terminalKey
     self.viewModel = viewModel
     self.dangerouslySkipPermissions = dangerouslySkipPermissions
+    self.permissionModePlan = permissionModePlan
     self.worktreeName = worktreeName
     self.onToggleTerminal = onToggleTerminal
     self.onStopMonitoring = onStopMonitoring
@@ -809,6 +812,7 @@ public struct MonitoringCardView: View {
           initialInputText: initialInputText,
           viewModel: viewModel,
           dangerouslySkipPermissions: dangerouslySkipPermissions,
+          permissionModePlan: permissionModePlan,
           worktreeName: worktreeName,
           onUserInteraction: onTerminalInteraction
         )

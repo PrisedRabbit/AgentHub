@@ -112,6 +112,7 @@ public final class MultiSessionLaunchViewModel {
   public var claudeUseWorktree: Bool = false
   public var claudeWorktreeName: String = ""
   public var isCodexSelected: Bool = false
+  public var isPlanModeEnabled: Bool = false
   public var sharedPrompt: String = ""
   public var attachedFiles: [AttachedFile] = []
   public var claudeBranchName: String = ""
@@ -393,6 +394,7 @@ public final class MultiSessionLaunchViewModel {
             branchName: singleBranchName,
             viewModel: claudeViewModel,
             dangerouslySkipPermissions: claudeMode.dangerouslySkipPermissions,
+            permissionModePlan: isPlanModeEnabled,
             progressSetter: { self.claudeProgress = $0 }
           )
         case .codex:
@@ -402,6 +404,7 @@ public final class MultiSessionLaunchViewModel {
             repoPath: repoPath,
             branchName: singleBranchName,
             viewModel: codexViewModel,
+            permissionModePlan: isPlanModeEnabled,
             progressSetter: { self.codexProgress = $0 }
           )
         }
@@ -509,7 +512,8 @@ public final class MultiSessionLaunchViewModel {
         plan: plan,
         repoPath: repoPath,
         viewModel: viewModel,
-        dangerouslySkipPermissions: dangerously
+        dangerouslySkipPermissions: dangerously,
+        permissionModePlan: isPlanModeEnabled
       )
     } else {
       // Fallback: single session with the full plan text (not the original prompt)
@@ -517,7 +521,8 @@ public final class MultiSessionLaunchViewModel {
         repoPath: repoPath,
         repoName: repo.name,
         viewModel: viewModel,
-        dangerouslySkipPermissions: dangerously
+        dangerouslySkipPermissions: dangerously,
+        permissionModePlan: isPlanModeEnabled
       )
     }
   }
@@ -527,7 +532,8 @@ public final class MultiSessionLaunchViewModel {
     plan: OrchestrationPlan,
     repoPath: String,
     viewModel: CLISessionsViewModel,
-    dangerouslySkipPermissions: Bool
+    dangerouslySkipPermissions: Bool,
+    permissionModePlan: Bool = false
   ) async {
     var errors: [String] = []
 
@@ -558,7 +564,8 @@ public final class MultiSessionLaunchViewModel {
         viewModel.startNewSessionInHub(
           worktree,
           initialPrompt: session.prompt,
-          dangerouslySkipPermissions: dangerouslySkipPermissions
+          dangerouslySkipPermissions: dangerouslySkipPermissions,
+          permissionModePlan: permissionModePlan
         )
         viewModel.refresh()
 
@@ -589,7 +596,8 @@ public final class MultiSessionLaunchViewModel {
     repoPath: String,
     repoName: String,
     viewModel: CLISessionsViewModel,
-    dangerouslySkipPermissions: Bool
+    dangerouslySkipPermissions: Bool,
+    permissionModePlan: Bool = false
   ) async {
     // Auto-generate branch name from prompt
     let promptSeed = sharedPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -624,7 +632,8 @@ public final class MultiSessionLaunchViewModel {
       viewModel.startNewSessionInHub(
         worktree,
         initialPrompt: initialPrompt,
-        dangerouslySkipPermissions: dangerouslySkipPermissions
+        dangerouslySkipPermissions: dangerouslySkipPermissions,
+        permissionModePlan: permissionModePlan
       )
       viewModel.refresh()
 
@@ -668,6 +677,7 @@ public final class MultiSessionLaunchViewModel {
     claudeUseWorktree = false
     claudeWorktreeName = ""
     isCodexSelected = false
+    isPlanModeEnabled = false
     claudeProgress = .idle
     codexProgress = .idle
     launchError = nil
@@ -708,6 +718,7 @@ public final class MultiSessionLaunchViewModel {
         initialPrompt: initialPrompt,
         initialInputText: initialInputText,
         dangerouslySkipPermissions: claudeMode.dangerouslySkipPermissions,
+        permissionModePlan: isPlanModeEnabled,
         worktreeName: claudeWorktreeOption
       )
     }
@@ -719,7 +730,8 @@ public final class MultiSessionLaunchViewModel {
       codexViewModel.startNewSessionInHub(
         worktree,
         initialPrompt: initialPrompt,
-        initialInputText: initialInputText
+        initialInputText: initialInputText,
+        permissionModePlan: isPlanModeEnabled
       )
     }
 
@@ -785,7 +797,8 @@ public final class MultiSessionLaunchViewModel {
         worktree,
         initialPrompt: initialPrompt,
         initialInputText: initialInputText,
-        dangerouslySkipPermissions: claudeMode.dangerouslySkipPermissions
+        dangerouslySkipPermissions: claudeMode.dangerouslySkipPermissions,
+        permissionModePlan: isPlanModeEnabled
       )
     }
 
@@ -796,7 +809,8 @@ public final class MultiSessionLaunchViewModel {
       codexViewModel.startNewSessionInHub(
         worktree,
         initialPrompt: initialPrompt,
-        initialInputText: initialInputText
+        initialInputText: initialInputText,
+        permissionModePlan: isPlanModeEnabled
       )
     }
 
@@ -811,6 +825,7 @@ public final class MultiSessionLaunchViewModel {
     branchName: String,
     viewModel: CLISessionsViewModel,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     progressSetter: @escaping (WorktreeCreationProgress) -> Void
   ) async {
     viewModel.addRepository(at: repoPath)
@@ -845,7 +860,8 @@ public final class MultiSessionLaunchViewModel {
       worktree,
       initialPrompt: initialPrompt,
       initialInputText: initialInputText,
-      dangerouslySkipPermissions: dangerouslySkipPermissions
+      dangerouslySkipPermissions: dangerouslySkipPermissions,
+      permissionModePlan: permissionModePlan
     )
     viewModel.refresh()
   }

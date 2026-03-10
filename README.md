@@ -129,6 +129,19 @@ In list mode, cards can be resized with a drag preview that commits on release.
 | Waiting for User | Awaiting input |
 | Idle | Session inactive |
 
+## Plan Mode
+
+Plan mode lets Claude read and analyze your codebase without executing any changes.
+Toggle it on or off with **Shift+Tab** inside the prompt editor in the multi-session launcher.
+When active, a teal indicator appears below the prompt.
+
+| Provider | Behavior |
+|---|---|
+| **Claude** | Launched with `--permission-mode plan`; reads files and plans but does not write or execute |
+| **Codex** | Not available — the Codex CLI has no flag to start in plan mode |
+
+> **Why isn't Codex supported?** Codex's plan mode (`ModeKind::Plan`) is a TUI-only collaboration mode that can only be toggled interactively inside the running terminal. The CLI always starts in Default mode with no override flag. When plan mode is active in AgentHub, the Codex provider pill is disabled to avoid confusion. Track upstream support at [openai/codex #12738](https://github.com/openai/codex/issues/12738).
+
 ## Configuration
 
 ### Display Mode

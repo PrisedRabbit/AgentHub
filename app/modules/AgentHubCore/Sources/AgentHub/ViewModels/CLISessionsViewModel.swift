@@ -248,6 +248,7 @@ public final class CLISessionsViewModel {
     initialInputText: String? = nil,
     isDark: Bool = true,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil
   ) -> TerminalContainerView {
     if let existing = activeTerminals[key] {
@@ -280,6 +281,7 @@ public final class CLISessionsViewModel {
       initialInputText: initialInputText,
       isDark: isDark,
       dangerouslySkipPermissions: dangerouslySkipPermissions,
+      permissionModePlan: permissionModePlan,
       worktreeName: worktreeName
     )
     activeTerminals[key] = terminal
@@ -1251,6 +1253,7 @@ public final class CLISessionsViewModel {
     initialPrompt: String? = nil,
     initialInputText: String? = nil,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil
   ) {
     // Each pending session gets a unique ID, so no need to clear existing terminals
@@ -1260,6 +1263,7 @@ public final class CLISessionsViewModel {
       initialPrompt: initialPrompt,
       initialInputText: initialInputText,
       dangerouslySkipPermissions: dangerouslySkipPermissions,
+      permissionModePlan: permissionModePlan,
       worktreeName: worktreeName
     )
     pendingHubSessions.append(pending)
