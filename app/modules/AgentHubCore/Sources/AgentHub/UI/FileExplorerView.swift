@@ -44,6 +44,7 @@ public struct FileExplorerView: View {
   @State private var expandedPaths: Set<String> = []
   @State private var scrollToPath: String?
 
+
   // MARK: - Init
 
   public init(
@@ -88,11 +89,9 @@ public struct FileExplorerView: View {
       }
     }
     .frame(
-      minWidth: isEmbedded ? 400 : 1000,
-      idealWidth: isEmbedded ? 600 : 1200,
+      minWidth: isEmbedded ? 400 : nil,
       maxWidth: .infinity,
-      minHeight: isEmbedded ? 400 : 500,
-      idealHeight: isEmbedded ? 600 : 750,
+      minHeight: isEmbedded ? 400 : nil,
       maxHeight: .infinity
     )
     .task {
@@ -236,7 +235,7 @@ public struct FileExplorerView: View {
       Divider()
 
       ScrollViewReader { proxy in
-        ScrollView {
+        ScrollView([.vertical, .horizontal]) {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(treeNodes) { node in
               FileTreeNodeView(
@@ -539,7 +538,7 @@ public struct CETextViewRepresentable: NSViewRepresentable {
   public func makeNSView(context: Context) -> NSScrollView {
     let scrollView = NSScrollView()
     scrollView.hasVerticalScroller = true
-    scrollView.hasHorizontalScroller = false
+    scrollView.hasHorizontalScroller = true
     scrollView.autohidesScrollers = true
     scrollView.borderType = .noBorder
 

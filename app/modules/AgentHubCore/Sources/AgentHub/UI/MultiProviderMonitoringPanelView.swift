@@ -46,6 +46,15 @@ extension SidePanelContent {
   }
 }
 
+// MARK: - FileExplorerPanelItem
+
+private struct FileExplorerPanelItem: Identifiable {
+  let id = UUID()
+  let session: CLISession
+  let projectPath: String
+  let initialFilePath: String?
+}
+
 // MARK: - SessionFileSheetItem
 
 private struct SessionFileSheetItem: Identifiable {
@@ -249,6 +258,7 @@ public struct MultiProviderMonitoringPanelView: View {
   @AppStorage(AgentHubDefaults.fileExplorerAlwaysModal)
   private var fileExplorerAlwaysModal: Bool = false
   @State private var showQuickFilePicker = false
+  @State private var fileExplorerPanelItem: FileExplorerPanelItem?
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.runtimeTheme) private var runtimeTheme
   @State private var cardHeights: [String: CGFloat] = [:]
@@ -315,7 +325,7 @@ public struct MultiProviderMonitoringPanelView: View {
         .frame(width: 0, height: 0)
         .hidden()
     }
-    .sheet(isPresented: $showQuickFilePicker) {
+    .floatingPanel(isPresented: $showQuickFilePicker, defaultSize: CGSize(width: 680, height: 640)) {
       if let primaryItem = allItems.first(where: { $0.id == effectivePrimarySessionId }) {
         QuickFilePickerView(
           isPresented: $showQuickFilePicker,
@@ -323,17 +333,38 @@ public struct MultiProviderMonitoringPanelView: View {
           onFileSelected: { path in
             showQuickFilePicker = false
             if case .monitored(_, _, let session, _) = primaryItem {
-              sidePanelContent = .fileExplorer(
-                sessionId: session.id,
-                session: session,
-                projectPath: primaryItem.projectPath,
-                initialFilePath: path,
-                navigationId: UUID()
-              )
+              if fileExplorerAlwaysModal {
+                fileExplorerPanelItem = FileExplorerPanelItem(
+                  session: session,
+                  projectPath: primaryItem.projectPath,
+                  initialFilePath: path
+                )
+              } else {
+                sidePanelContent = .fileExplorer(
+                  sessionId: session.id,
+                  session: session,
+                  projectPath: primaryItem.projectPath,
+                  initialFilePath: path,
+                  navigationId: UUID()
+                )
+              }
             }
           }
         )
       }
+    }
+    .modalPanel(
+      item: $fileExplorerPanelItem,
+      title: "File Explorer",
+      autosaveName: "com.agenthub.panel.fileExplorer"
+    ) { item in
+      FileExplorerView(
+        session: item.session,
+        projectPath: item.projectPath,
+        onDismiss: { fileExplorerPanelItem = nil },
+        isEmbedded: false,
+        initialFilePath: item.initialFilePath
+      )
     }
     .sheet(item: $sessionFileSheetItem) { item in
       MonitoringSessionFileSheetView(
