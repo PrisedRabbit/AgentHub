@@ -231,7 +231,11 @@ public struct MonitoringCardView: View {
       handleDroppedFiles(providers)
       return true
     }
-    .sheet(item: $gitDiffSheetItem) { item in
+    .modalPanel(
+      item: $gitDiffSheetItem,
+      title: "Git Diff",
+      autosaveName: "com.agenthub.panel.gitDiff"
+    ) { item in
       GitDiffView(
         session: item.session,
         projectPath: item.projectPath,
@@ -288,7 +292,11 @@ public struct MonitoringCardView: View {
         }
       )
     }
-    .sheet(item: $fileExplorerSheetItem) { item in
+    .modalPanel(
+      item: $fileExplorerSheetItem,
+      title: "File Explorer",
+      autosaveName: "com.agenthub.panel.fileExplorer"
+    ) { item in
       FileExplorerView(
         session: item.session,
         projectPath: item.projectPath,

@@ -93,7 +93,7 @@ public struct QuickFilePickerView: View {
               }
             }
           }
-          .frame(maxHeight: 320)
+          .frame(maxHeight: min(CGFloat(results.count) * 48 + 4, 440))
           .onChange(of: selectedIndex) { _, newIndex in
             withAnimation { proxy.scrollTo(newIndex, anchor: .center) }
           }
@@ -128,8 +128,35 @@ public struct QuickFilePickerView: View {
       }
     }
     .frame(width: 580)
+    .fixedSize(horizontal: false, vertical: true)
+    .background(.regularMaterial)
+    .clipShape(RoundedRectangle(cornerRadius: 12))
+    .shadow(color: .black.opacity(0.3), radius: 20, y: 8)
+    .overlay(
+      RoundedRectangle(cornerRadius: 12)
+        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .padding(.horizontal, 50)
+    .padding(.top, 140)
+    .padding(.bottom, 50)
     .onAppear {
       isSearchFocused = true
+      // @FocusState doesn't work in borderless NSPanel — force focus via AppKit
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        guard let window = NSApp.keyWindow else { return }
+        func findTextField(in view: NSView) -> NSTextField? {
+          if let tf = view as? NSTextField, tf.isEditable { return tf }
+          for sub in view.subviews {
+            if let found = findTextField(in: sub) { return found }
+          }
+          return nil
+        }
+        if let contentView = window.contentView,
+           let textField = findTextField(in: contentView) {
+          window.makeFirstResponder(textField)
+        }
+      }
     }
     .task(id: searchQuery) {
       // Automatically cancels previous task when searchQuery changes

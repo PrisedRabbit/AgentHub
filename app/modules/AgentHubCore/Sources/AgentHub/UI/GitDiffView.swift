@@ -117,8 +117,10 @@ public struct GitDiffView: View {
       }
     }
     .frame(
-      minWidth: isEmbedded ? 400 : 1200, idealWidth: .infinity, maxWidth: .infinity,
-      minHeight: isEmbedded ? 400 : 800, idealHeight: .infinity, maxHeight: .infinity
+      minWidth: isEmbedded ? 400 : nil,
+      maxWidth: .infinity,
+      minHeight: isEmbedded ? 400 : nil,
+      maxHeight: .infinity
     )
     .onKeyPress(.escape) {
       if inlineEditorState.isShowing {
