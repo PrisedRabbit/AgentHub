@@ -128,6 +128,18 @@ public enum AgentHubDefaults {
   /// Type: Bool (default: false)
   public static let flatSessionLayout = "\(keyPrefix)hub.flatSessionLayout"
 
+  /// Whether file explorer always opens as a modal (never as side panel)
+  /// Type: Bool (default: false)
+  public static let fileExplorerAlwaysModal = "\(keyPrefix)features.fileExplorerAlwaysModal"
+
+  /// Width of the side panel (diff, plan, web preview, file explorer) in the single-session layout
+  /// Type: Double (default: 700)
+  public static let sidePanelWidth = "\(keyPrefix)ui.sidePanelWidth"
+
+  /// Width of the file tree sidebar inside FileExplorerView
+  /// Type: Double (default: 240)
+  public static let fileExplorerSidebarWidth = "\(keyPrefix)ui.fileExplorerSidebarWidth"
+
   // MARK: - Theme Settings
 
   /// Selected color theme name
