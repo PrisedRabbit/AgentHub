@@ -34,6 +34,7 @@ public struct FileExplorerView: View {
   @State private var isLoading = true
   @State private var selectedFilePath: String?
   @State private var fileContent: String = ""
+  @State private var savedFileContent: String = ""
   @State private var isLoadingFile = false
   @State private var fileError: String?
   @State private var hasUnsavedChanges = false
@@ -65,9 +66,6 @@ public struct FileExplorerView: View {
 
   public var body: some View {
     VStack(spacing: 0) {
-      header
-      Divider()
-
       if isLoading {
         VStack(spacing: 12) {
           ProgressView()
@@ -79,11 +77,21 @@ public struct FileExplorerView: View {
       } else {
         HStack(spacing: 0) {
           if showSidebar {
-            fileTreeSidebar
-              .frame(width: 240)
-            Divider()
+            ResizablePanelContainer(
+              side: .leading,
+              minWidth: 160,
+              maxWidth: 480,
+              defaultWidth: 240,
+              userDefaultsKey: AgentHubDefaults.fileExplorerSidebarWidth
+            ) {
+              fileTreeSidebar
+            }
           }
-          fileContentArea
+          VStack(spacing: 0) {
+            contentAreaHeader
+            Divider()
+            fileContentArea
+          }
         }
         .animation(.easeInOut(duration: 0.25), value: showSidebar)
       }
@@ -127,11 +135,11 @@ public struct FileExplorerView: View {
     }
   }
 
-  // MARK: - Header
+  // MARK: - Content Area Header
 
-  private var header: some View {
+  private var contentAreaHeader: some View {
     HStack(spacing: 8) {
-      // Sidebar toggle
+      // Sidebar toggle (matches GitDiffView pattern)
       Button {
         showSidebar.toggle()
       } label: {
@@ -198,7 +206,7 @@ public struct FileExplorerView: View {
         .disabled(isSaving)
       }
 
-      // Close button (always visible)
+      // Close button
       Button {
         if hasUnsavedChanges {
           showDiscardAlert = true
@@ -236,7 +244,7 @@ public struct FileExplorerView: View {
 
       ScrollViewReader { proxy in
         ScrollView([.vertical, .horizontal]) {
-          VStack(alignment: .leading, spacing: 0) {
+          LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(treeNodes) { node in
               FileTreeNodeView(
                 node: node,
@@ -306,8 +314,11 @@ public struct FileExplorerView: View {
       CETextViewRepresentable(
         text: $fileContent,
         fileName: selectedFilePath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "",
-        onTextChange: { hasUnsavedChanges = true }
+        onTextChange: { updatedText in
+          hasUnsavedChanges = updatedText != savedFileContent
+        }
       )
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 
@@ -325,23 +336,39 @@ public struct FileExplorerView: View {
       "png", "jpg", "jpeg", "gif", "pdf", "zip", "tar", "gz",
       "exe", "dylib", "a", "o", "mp3", "mp4", "mov", "woff", "ttf"
     ]
+    selectedFilePath = path
+    fileError = nil
+    saveError = nil
+    isLoadingFile = false
+    fileContent = ""
+    savedFileContent = ""
+    hasUnsavedChanges = false
+
     guard !binaryExts.contains(ext) else {
       fileError = "Binary files cannot be displayed."
-      selectedFilePath = path
+      return
+    }
+
+    // Guard against loading very large files that would exhaust memory
+    let fm = FileManager.default
+    if let attrs = try? fm.attributesOfItem(atPath: path),
+       let fileSize = attrs[.size] as? UInt64, fileSize > 10_000_000 {
+      fileError = "File is too large to display (>10 MB)."
       return
     }
 
     isLoadingFile = true
-    fileError = nil
-    saveError = nil
-    selectedFilePath = path
-    hasUnsavedChanges = false
 
     do {
-      let content = try await FileIndexService.shared.readFile(at: path)
+      let content = try await FileIndexService.shared.readFile(at: path, projectPath: projectPath)
       fileContent = content
+      savedFileContent = content
+      hasUnsavedChanges = false
       await FileIndexService.shared.addToRecent(path)
     } catch {
+      fileContent = ""
+      savedFileContent = ""
+      hasUnsavedChanges = false
       fileError = "Could not read file: \(error.localizedDescription)"
     }
     isLoadingFile = false
@@ -354,8 +381,9 @@ public struct FileExplorerView: View {
     let content = fileContent
     Task {
       do {
-        try await FileIndexService.shared.writeFile(at: path, content: content)
+        try await FileIndexService.shared.writeFile(at: path, content: content, projectPath: projectPath)
         await MainActor.run {
+          savedFileContent = content
           hasUnsavedChanges = false
           isSaving = false
         }
@@ -528,7 +556,7 @@ public struct CETextViewRepresentable: NSViewRepresentable {
 
   @Binding var text: String
   let fileName: String
-  let onTextChange: () -> Void
+  let onTextChange: (String) -> Void
   @Environment(\.colorScheme) private var colorScheme
 
   public func makeCoordinator() -> Coordinator {
@@ -541,6 +569,8 @@ public struct CETextViewRepresentable: NSViewRepresentable {
     scrollView.hasHorizontalScroller = true
     scrollView.autohidesScrollers = true
     scrollView.borderType = .noBorder
+    scrollView.contentView.postsFrameChangedNotifications = true
+    scrollView.contentView.postsBoundsChangedNotifications = true
 
     let textView = TextView(
       string: text,
@@ -557,6 +587,7 @@ public struct CETextViewRepresentable: NSViewRepresentable {
     textView.edgeInsets = HorizontalEdgeInsets(left: 8, right: 8)
 
     scrollView.documentView = textView
+    textView.updateFrameIfNeeded()
     context.coordinator.textView = textView
     context.coordinator.applySyntaxHighlighting(
       text: text, fileName: fileName, colorScheme: colorScheme
@@ -569,6 +600,7 @@ public struct CETextViewRepresentable: NSViewRepresentable {
     if textView.string != text {
       context.coordinator.isUpdatingFromBinding = true
       textView.string = text
+      textView.updateFrameIfNeeded()
       context.coordinator.isUpdatingFromBinding = false
       context.coordinator.applySyntaxHighlighting(
         text: text, fileName: fileName, colorScheme: colorScheme
@@ -607,7 +639,7 @@ public struct CETextViewRepresentable: NSViewRepresentable {
       DispatchQueue.main.async { [weak self] in
         guard let self else { return }
         self.parent.text = newText
-        self.parent.onTextChange()
+        self.parent.onTextChange(newText)
       }
       // Re-highlight after edit with debounce
       scheduleRehighlight(text: textView.string)

@@ -248,6 +248,7 @@ public final class CLISessionsViewModel {
     initialInputText: String? = nil,
     isDark: Bool = true,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil
   ) -> TerminalContainerView {
     if let existing = activeTerminals[key] {
@@ -256,9 +257,12 @@ public final class CLISessionsViewModel {
       #endif
       // Send prompt to existing terminal if provided
       if let prompt = initialPrompt {
-        // Reset the delivery flag so this new prompt can be sent
-        existing.resetPromptDeliveryFlag()
-        existing.sendPromptIfNeeded(prompt)
+        if !key.hasPrefix("pending-") {
+          // Resume scenario: send prompt to existing terminal (e.g., inline edit).
+          // For pending sessions, the prompt is already embedded in CLI args — don't re-send.
+          existing.resetPromptDeliveryFlag()
+          existing.sendPromptIfNeeded(prompt)
+        }
         clearPendingPrompt(for: key)  // Clear after sending
       }
       if let inputText = initialInputText, !inputText.isEmpty {
@@ -280,6 +284,7 @@ public final class CLISessionsViewModel {
       initialInputText: initialInputText,
       isDark: isDark,
       dangerouslySkipPermissions: dangerouslySkipPermissions,
+      permissionModePlan: permissionModePlan,
       worktreeName: worktreeName
     )
     activeTerminals[key] = terminal
@@ -1291,6 +1296,7 @@ public final class CLISessionsViewModel {
     initialPrompt: String? = nil,
     initialInputText: String? = nil,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil
   ) {
     // Each pending session gets a unique ID, so no need to clear existing terminals
@@ -1300,6 +1306,7 @@ public final class CLISessionsViewModel {
       initialPrompt: initialPrompt,
       initialInputText: initialInputText,
       dangerouslySkipPermissions: dangerouslySkipPermissions,
+      permissionModePlan: permissionModePlan,
       worktreeName: worktreeName
     )
     pendingHubSessions.append(pending)

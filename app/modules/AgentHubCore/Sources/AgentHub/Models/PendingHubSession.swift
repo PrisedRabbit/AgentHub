@@ -16,6 +16,7 @@ public struct PendingHubSession: Identifiable {
   public let initialPrompt: String?
   public let initialInputText: String?
   public let dangerouslySkipPermissions: Bool
+  public let permissionModePlan: Bool
   /// nil = no worktree flag; "" = --worktree (auto-name); non-empty = --worktree <name>
   public let worktreeName: String?
 
@@ -24,6 +25,7 @@ public struct PendingHubSession: Identifiable {
     initialPrompt: String? = nil,
     initialInputText: String? = nil,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil
   ) {
     self.id = UUID()
@@ -32,6 +34,7 @@ public struct PendingHubSession: Identifiable {
     self.initialPrompt = initialPrompt
     self.initialInputText = initialInputText
     self.dangerouslySkipPermissions = dangerouslySkipPermissions
+    self.permissionModePlan = permissionModePlan
     self.worktreeName = worktreeName
   }
 

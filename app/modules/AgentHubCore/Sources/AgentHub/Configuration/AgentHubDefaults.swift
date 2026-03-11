@@ -153,6 +153,14 @@ public enum AgentHubDefaults {
   /// Web server listen port. Type: Int (default: 8080)
   public static let webServerPort = "\(keyPrefix)webServer.port"
 
+  /// Width of the side panel (diff, plan, web preview, file explorer) in the single-session layout
+  /// Type: Double (default: 700)
+  public static let sidePanelWidth = "\(keyPrefix)ui.sidePanelWidth"
+
+  /// Width of the file tree sidebar inside FileExplorerView
+  /// Type: Double (default: 240)
+  public static let fileExplorerSidebarWidth = "\(keyPrefix)ui.fileExplorerSidebarWidth"
+
   // MARK: - Theme Settings
 
   /// Selected color theme name

@@ -22,7 +22,9 @@ https://github.com/user-attachments/assets/ee453a78-e417-488a-96c7-20732d1d1f60
 - **Real-time session monitoring** — Watch all sessions update live via file-system watchers (no polling)
 - **Embedded terminal** — Full PTY terminal (SwiftTerm) inside each monitoring card; resume or start sessions without leaving the app
 - **Hub panel** — Unified view of all sessions across providers with single, list, 2-column, and 3-column grid layouts
+- **Resizable list cards** — In list mode, monitoring cards can be resized with a preview guide for a smoother, less distracting resize experience
 - **Inline diff review** — Full split-pane diff view with inline editor to send change requests directly to Claude
+- **File explorer and built-in editor** — Browse the project tree, jump to files with Cmd+P, edit files in-app with syntax highlighting, and save changes without leaving AgentHub
 - **Git worktree management** — Create and delete worktrees from the UI; launch sessions on new branches
 - **Remix with provider picker** — Branch any session into an isolated git worktree and continue it in Claude or Codex; the original session's transcript is passed as context to the new session
 - **Multi-session launcher** — Launch parallel sessions across Claude and Codex with manual prompts or AI-planned orchestration (Smart mode)
@@ -52,6 +54,14 @@ Mermaid diagram rendering with image export
 
 https://github.com/user-attachments/assets/f6a304de-fc7c-4024-94c6-9e2222210dff
 
+## File Explorer
+
+AgentHub includes a built-in file explorer and editor for supported text files. Open the quick file picker with **Cmd+P** to jump directly to a file, then edit and save changes from inside the side panel without leaving the app.
+
+File explorer, quick open, and built-in editor
+
+https://github.com/user-attachments/assets/6d263d11-6648-42e7-9335-04aa51a33296
+
 ## Requirements
 
 - macOS 14.0+
@@ -69,6 +79,7 @@ Updates are delivered automatically via [Sparkle](https://sparkle-project.org/) 
 | Shortcut | Action |
 |---|---|
 | **Cmd+K** | Open command palette |
+| **Cmd+P** | Quick open files |
 | **Cmd+N** | New session |
 | **Cmd+B** | Toggle sidebar |
 | **Cmd+,** | Open settings |
@@ -87,6 +98,14 @@ Updates are delivered automatically via [Sparkle](https://sparkle-project.org/) 
 | **Cmd+Return** | Add comment to review collection |
 | **Shift+Return** | Insert newline in editor |
 | **Escape** | Close inline editor or diff view |
+
+### File Explorer
+
+| Shortcut | Action |
+|---|---|
+| **Cmd+P** | Open quick file picker |
+| **Cmd+S** | Save current file in file editor |
+| **Escape** | Close quick file picker or file editor |
 
 ### Embedded Terminal
 
@@ -116,6 +135,7 @@ The monitoring panel supports multiple layout modes:
 | **3-Column** | Three-column grid |
 
 Any card can be maximized to full panel with a click (Escape to restore).
+In list mode, cards can be resized with a drag preview that commits on release.
 
 ## Session States
 
@@ -126,6 +146,19 @@ Any card can be maximized to full panel with a click (Escape to restore).
 | Awaiting Approval | Tool requires user confirmation |
 | Waiting for User | Awaiting input |
 | Idle | Session inactive |
+
+## Plan Mode
+
+Plan mode lets Claude read and analyze your codebase without executing any changes.
+Toggle it on or off with **Shift+Tab** inside the prompt editor in the multi-session launcher.
+When active, a teal indicator appears below the prompt.
+
+| Provider | Behavior |
+|---|---|
+| **Claude** | Launched with `--permission-mode plan`; reads files and plans but does not write or execute |
+| **Codex** | Not available — the Codex CLI has no flag to start in plan mode |
+
+> **Why isn't Codex supported?** Codex's plan mode (`ModeKind::Plan`) is a TUI-only collaboration mode that can only be toggled interactively inside the running terminal. The CLI always starts in Default mode with no override flag. When plan mode is active in AgentHub, the Codex provider pill is disabled to avoid confusion. Track upstream support at [openai/codex #12738](https://github.com/openai/codex/issues/12738).
 
 ## Configuration
 

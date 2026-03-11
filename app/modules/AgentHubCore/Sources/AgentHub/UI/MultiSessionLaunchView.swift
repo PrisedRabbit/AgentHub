@@ -43,6 +43,14 @@ public struct MultiSessionLaunchView: View {
 
         promptEditor
 
+        if viewModel.isPlanModeEnabled {
+          planModeHint
+            .transition(.asymmetric(
+              insertion: .move(edge: .top).combined(with: .opacity),
+              removal: .move(edge: .top).combined(with: .opacity)
+            ))
+        }
+
         if !viewModel.attachedFiles.isEmpty {
           attachedFilesSection
         }
@@ -86,6 +94,10 @@ public struct MultiSessionLaunchView: View {
 
         actionButtons
       }
+    }
+    .animation(.easeInOut(duration: 0.2), value: viewModel.isPlanModeEnabled)
+    .onChange(of: viewModel.isPlanModeEnabled) { _, enabled in
+      if enabled { viewModel.isCodexSelected = false }
     }
     .padding(DesignTokens.Spacing.md)
     .background(
@@ -320,6 +332,13 @@ public struct MultiSessionLaunchView: View {
         .font(.system(size: 12))
         .scrollContentBackground(.hidden)
         .padding(2)
+        .onKeyPress { press in
+          if press.key == KeyEquivalent("\u{19}") {
+            viewModel.isPlanModeEnabled.toggle()
+            return .handled
+          }
+          return .ignored
+        }
     }
     .frame(minHeight: 60, maxHeight: 120)
     .padding(4)
@@ -577,8 +596,24 @@ public struct MultiSessionLaunchView: View {
       claudePill
       providerPill(
         label: "Codex",
-        isSelected: $viewModel.isCodexSelected
+        isSelected: $viewModel.isCodexSelected,
+        disabled: viewModel.isPlanModeEnabled
       )
+      Spacer()
+    }
+  }
+
+  private var planModeHint: some View {
+    HStack(spacing: 5) {
+      Image(systemName: "pause.fill")
+        .font(.system(size: 8))
+        .foregroundStyle(Color(nsColor: .systemTeal))
+      Text("plan mode on")
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(Color(nsColor: .systemTeal))
+      Text("(shift+tab to cycle)")
+        .font(.system(size: 11))
+        .foregroundColor(.secondary)
       Spacer()
     }
   }
@@ -694,19 +729,31 @@ public struct MultiSessionLaunchView: View {
     }
   }
 
-  private func providerPill(label: String, isSelected: Binding<Bool>) -> some View {
-    Button(action: { isSelected.wrappedValue.toggle() }) {
+  private func providerPill(label: String, isSelected: Binding<Bool>, disabled: Bool = false) -> some View {
+    Button(action: {
+      guard !disabled else { return }
+      isSelected.wrappedValue.toggle()
+    }) {
       Text(label)
         .font(.system(size: 11, weight: .medium))
-        .foregroundColor(isSelected.wrappedValue ? (colorScheme == .dark ? .black : .white) : .secondary)
+        .foregroundColor(
+          disabled ? .secondary.opacity(0.4)
+            : isSelected.wrappedValue ? (colorScheme == .dark ? .black : .white)
+            : .secondary
+        )
         .padding(.horizontal, 14)
         .padding(.vertical, 5)
         .background(
           Capsule()
-            .fill(isSelected.wrappedValue ? (colorScheme == .dark ? Color.white : Color.black) : Color.primary.opacity(0.06))
+            .fill(
+              disabled ? Color.primary.opacity(0.03)
+                : isSelected.wrappedValue ? (colorScheme == .dark ? Color.white : Color.black)
+                : Color.primary.opacity(0.06)
+            )
         )
     }
     .buttonStyle(.plain)
+    .disabled(disabled)
   }
 
   // MARK: - Progress
@@ -1263,11 +1310,17 @@ public struct MultiSessionLaunchView: View {
                 .scaleEffect(0.7)
             }
             Text(launchButtonTitle)
+            if !viewModel.isLaunching {
+              Text("⌘↵")
+                .font(.system(size: 11, weight: .regular))
+                .opacity(0.7)
+            }
           }
         }
         .buttonStyle(.borderedProminent)
         .tint(.primary)
         .disabled(!viewModel.isValid || viewModel.isLaunching)
+        .keyboardShortcut(.return, modifiers: .command)
       }
     }
   }

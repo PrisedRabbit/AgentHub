@@ -54,6 +54,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
   let initialInputText: String?  // Optional: text to prefill terminal input without Enter
   let viewModel: CLISessionsViewModel?  // For shared terminal storage
   let dangerouslySkipPermissions: Bool  // One-shot flag for new sessions
+  let permissionModePlan: Bool  // One-shot flag: start session in plan mode
   let worktreeName: String?  // nil = no --worktree; "" = auto-name; non-empty = named
   let onUserInteraction: (() -> Void)?
 
@@ -66,6 +67,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
     initialInputText: String? = nil,
     viewModel: CLISessionsViewModel? = nil,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil,
     onUserInteraction: (() -> Void)? = nil
   ) {
@@ -77,6 +79,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
     self.initialInputText = initialInputText
     self.viewModel = viewModel
     self.dangerouslySkipPermissions = dangerouslySkipPermissions
+    self.permissionModePlan = permissionModePlan
     self.worktreeName = worktreeName
     self.onUserInteraction = onUserInteraction
   }
@@ -95,6 +98,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
         initialInputText: initialInputText,
         isDark: isDark,
         dangerouslySkipPermissions: dangerouslySkipPermissions,
+        permissionModePlan: permissionModePlan,
         worktreeName: worktreeName
       )
       terminalContainer.onUserInteraction = onUserInteraction
@@ -111,6 +115,7 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
       initialInputText: initialInputText,
       isDark: isDark,
       dangerouslySkipPermissions: dangerouslySkipPermissions,
+      permissionModePlan: permissionModePlan,
       worktreeName: worktreeName
     )
     containerView.onUserInteraction = onUserInteraction
@@ -118,11 +123,8 @@ public struct EmbeddedTerminalView: NSViewRepresentable {
   }
 
   public func updateNSView(_ nsView: TerminalContainerView, context: Context) {
-    // Update colors only when color scheme actually changes
-    let isDark = colorScheme == .dark
-    nsView.updateColors(isDark: isDark)
     nsView.onUserInteraction = onUserInteraction
-    nsView.updateFont(name: terminalFontName, size: CGFloat(terminalFontSize))
+    nsView.syncAppearance(isDark: colorScheme == .dark, fontName: terminalFontName, fontSize: CGFloat(terminalFontSize))
 
     // If there's a pending prompt in the viewModel, send it (and clear it)
     // Use terminalKey (not sessionId) since it works for both pending and real sessions
@@ -143,9 +145,9 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
   private var registeredSessionId: String?
   private var hasDeliveredInitialPrompt = false
   private var hasPrefilledInitialInputText = false
-  private var appliedFontName: String = ""
-  private var appliedFontSize: CGFloat = 0
-  private var appliedIsDark: Bool? = nil
+  private var lastAppliedFontName: String?
+  private var lastAppliedFontSize: CGFloat?
+  private var lastAppliedIsDark: Bool?
   private var terminalPidMap: [ObjectIdentifier: pid_t] = [:]
   private var localEventMonitor: Any?
   public var onUserInteraction: (() -> Void)?
@@ -207,13 +209,19 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
     initialInputText: String? = nil,
     isDark: Bool = true,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil
   ) {
     guard !isConfigured else { return }
     isConfigured = true
 
-    // Create and configure terminal view
-    let terminal = SafeLocalProcessTerminalView(frame: bounds)
+    // Create and configure terminal view.
+    // Use a sensible fallback frame when bounds is zero (view not yet laid out by SwiftUI).
+    // SwiftTerm calculates column/row count from the initial frame — a zero frame produces a
+    // ~2-column terminal that wraps every character. Auto Layout will correct the size on the
+    // next layout pass and SwiftTerm's setFrameSize override sends SIGWINCH to the process.
+    let initialFrame = bounds.isEmpty ? CGRect(x: 0, y: 0, width: 800, height: 600) : bounds
+    let terminal = SafeLocalProcessTerminalView(frame: initialFrame)
     terminal.translatesAutoresizingMaskIntoConstraints = false
     terminal.processDelegate = self
 
@@ -240,6 +248,7 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
       cliConfiguration: cliConfiguration,
       initialPrompt: initialPrompt,
       dangerouslySkipPermissions: dangerouslySkipPermissions,
+      permissionModePlan: permissionModePlan,
       worktreeName: worktreeName
     )
     registerProcessIfNeeded(for: terminal)
@@ -339,22 +348,29 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
     typeText(text)
   }
 
-  /// Updates terminal font and size.
-  public func updateFont(name: String, size: CGFloat) {
+  public func syncAppearance(isDark: Bool, fontName: String = "SF Mono", fontSize: CGFloat) {
+    updateColors(isDark: isDark)
+    updateFont(name: fontName, size: fontSize)
+  }
+
+  /// Updates terminal font name and size.
+  public func updateFont(name: String = "SF Mono", size: CGFloat) {
     guard let terminal = terminalView else { return }
-    guard name != appliedFontName || size != appliedFontSize else { return }
-    appliedFontName = name
-    appliedFontSize = size
-    terminal.font = NSFont(name: name, size: size)
-      ?? NSFont(name: "Menlo", size: size)
-      ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    let resolvedSize = max(size, 8)
+    guard lastAppliedFontName != name || lastAppliedFontSize != resolvedSize else { return }
+
+    let font = NSFont(name: name, size: resolvedSize)
+      ?? NSFont(name: "Menlo", size: resolvedSize)
+      ?? NSFont.monospacedSystemFont(ofSize: resolvedSize, weight: .regular)
+    terminal.font = font
+    lastAppliedFontName = name
+    lastAppliedFontSize = resolvedSize
   }
 
   /// Updates terminal colors based on color scheme.
   /// Called when the app's color scheme changes.
   public func updateColors(isDark: Bool) {
-    guard appliedIsDark != isDark else { return }
-    appliedIsDark = isDark
+    guard lastAppliedIsDark != isDark else { return }
     guard let terminal = terminalView else { return }
 
     if isDark {
@@ -365,8 +381,30 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
       terminal.nativeForegroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
     }
 
-    // Force redraw
+    lastAppliedIsDark = isDark
     terminal.needsDisplay = true
+  }
+
+  private func applyInitialAppearance(to terminal: TerminalView, isDark: Bool) {
+    let storedSize = UserDefaults.standard.double(forKey: AgentHubDefaults.terminalFontSize)
+    let fontSize = storedSize > 0 ? CGFloat(storedSize) : 12
+    let fontName = UserDefaults.standard.string(forKey: AgentHubDefaults.terminalFontName) ?? "SF Mono"
+    lastAppliedFontName = fontName
+    lastAppliedFontSize = fontSize
+    let font = NSFont(name: fontName, size: fontSize)
+      ?? NSFont(name: "Menlo", size: fontSize)
+      ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    terminal.font = font
+
+    if isDark {
+      terminal.nativeBackgroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.12, alpha: 1.0)
+      terminal.nativeForegroundColor = NSColor(red: 0.9, green: 0.9, blue: 0.88, alpha: 1.0)
+    } else {
+      terminal.nativeBackgroundColor = NSColor(red: 0.98, green: 0.98, blue: 0.98, alpha: 1.0)
+      terminal.nativeForegroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
+    }
+
+    lastAppliedIsDark = isDark
   }
 
   private func installInteractionMonitorIfNeeded() {
@@ -382,6 +420,9 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
           self.onUserInteraction?()
         }
       case .leftMouseUp:
+        guard !ResizeInteractionSuppression.shared.shouldSuppressSelection else {
+          return event
+        }
         guard let window = terminal.window, event.window === window else { return event }
         let locationInTerminal = terminal.convert(event.locationInWindow, from: nil)
         if terminal.bounds.contains(locationInTerminal) {
@@ -408,22 +449,7 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
   }
 
   private func configureTerminalAppearance(_ terminal: TerminalView, isDark: Bool) {
-    // Use a monospace font that looks good in terminals
-    let storedSize = UserDefaults.standard.double(forKey: AgentHubDefaults.terminalFontSize)
-    let fontSize = storedSize > 0 ? CGFloat(storedSize) : 12
-    let fontName = UserDefaults.standard.string(forKey: AgentHubDefaults.terminalFontName) ?? "SF Mono"
-    terminal.font = NSFont(name: fontName, size: fontSize)
-      ?? NSFont(name: "Menlo", size: fontSize)
-      ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-
-    // Configure colors based on color scheme
-    if isDark {
-      terminal.nativeBackgroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.12, alpha: 1.0)
-      terminal.nativeForegroundColor = NSColor(red: 0.9, green: 0.9, blue: 0.88, alpha: 1.0)
-    } else {
-      terminal.nativeBackgroundColor = NSColor(red: 0.98, green: 0.98, blue: 0.98, alpha: 1.0)
-      terminal.nativeForegroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
-    }
+    applyInitialAppearance(to: terminal, isDark: isDark)
 
     // Set cursor color to match brand (bookCloth color)
     terminal.caretColor = NSColor(red: 204/255, green: 120/255, blue: 92/255, alpha: 1.0)
@@ -436,6 +462,7 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
     cliConfiguration: CLICommandConfiguration,
     initialPrompt: String? = nil,
     dangerouslySkipPermissions: Bool = false,
+    permissionModePlan: Bool = false,
     worktreeName: String? = nil
   ) {
     // Find the CLI executable using just the executable name (first word of command)
@@ -510,7 +537,8 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
       sessionId: sessionId,
       prompt: initialPrompt,
       dangerouslySkipPermissions: dangerouslySkipPermissions,
-      worktreeName: worktreeName
+      worktreeName: worktreeName,
+      permissionModePlan: permissionModePlan
     )
     let escapedArgs = args.map { $0.replacingOccurrences(of: "'", with: "'\\''") }
     let joinedArgs = escapedArgs.map { "'\($0)'" }.joined(separator: " ")
