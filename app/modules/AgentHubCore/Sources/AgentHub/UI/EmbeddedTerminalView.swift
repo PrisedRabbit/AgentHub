@@ -205,8 +205,13 @@ public class TerminalContainerView: NSView, ManagedLocalProcessTerminalViewDeleg
     guard !isConfigured else { return }
     isConfigured = true
 
-    // Create and configure terminal view
-    let terminal = SafeLocalProcessTerminalView(frame: bounds)
+    // Create and configure terminal view.
+    // Use a sensible fallback frame when bounds is zero (view not yet laid out by SwiftUI).
+    // SwiftTerm calculates column/row count from the initial frame — a zero frame produces a
+    // ~2-column terminal that wraps every character. Auto Layout will correct the size on the
+    // next layout pass and SwiftTerm's setFrameSize override sends SIGWINCH to the process.
+    let initialFrame = bounds.isEmpty ? CGRect(x: 0, y: 0, width: 800, height: 600) : bounds
+    let terminal = SafeLocalProcessTerminalView(frame: initialFrame)
     terminal.translatesAutoresizingMaskIntoConstraints = false
     terminal.processDelegate = self
 

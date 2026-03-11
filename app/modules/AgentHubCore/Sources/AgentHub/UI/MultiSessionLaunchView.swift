@@ -1310,11 +1310,17 @@ public struct MultiSessionLaunchView: View {
                 .scaleEffect(0.7)
             }
             Text(launchButtonTitle)
+            if !viewModel.isLaunching {
+              Text("⌘↵")
+                .font(.system(size: 11, weight: .regular))
+                .opacity(0.7)
+            }
           }
         }
         .buttonStyle(.borderedProminent)
         .tint(.primary)
         .disabled(!viewModel.isValid || viewModel.isLaunching)
+        .keyboardShortcut(.return, modifiers: .command)
       }
     }
   }

@@ -257,9 +257,12 @@ public final class CLISessionsViewModel {
       #endif
       // Send prompt to existing terminal if provided
       if let prompt = initialPrompt {
-        // Reset the delivery flag so this new prompt can be sent
-        existing.resetPromptDeliveryFlag()
-        existing.sendPromptIfNeeded(prompt)
+        if !key.hasPrefix("pending-") {
+          // Resume scenario: send prompt to existing terminal (e.g., inline edit).
+          // For pending sessions, the prompt is already embedded in CLI args — don't re-send.
+          existing.resetPromptDeliveryFlag()
+          existing.sendPromptIfNeeded(prompt)
+        }
         clearPendingPrompt(for: key)  // Clear after sending
       }
       if let inputText = initialInputText, !inputText.isEmpty {
