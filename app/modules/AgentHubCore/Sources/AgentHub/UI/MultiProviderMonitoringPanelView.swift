@@ -721,21 +721,35 @@ public struct MultiProviderMonitoringPanelView: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
 
           if let panelContent = sidePanelContent, !panelContent.isFileExplorer {
-            sidePanelView(for: panelContent, viewModel: viewModel)
-              .frame(minWidth: 700)
+            ResizablePanelContainer(
+              side: .trailing,
+              minWidth: 400,
+              maxWidth: 1200,
+              defaultWidth: 700,
+              userDefaultsKey: AgentHubDefaults.sidePanelWidth
+            ) {
+              sidePanelView(for: panelContent, viewModel: viewModel)
+            }
           }
 
           // FileExplorer side panel
           if sidePanelContent?.isFileExplorer == true, let feSession = persistedFESession {
-            FileExplorerView(
-              session: feSession,
-              projectPath: persistedFEProjectPath,
-              onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { sidePanelContent = nil } },
-              isEmbedded: true,
-              initialFilePath: persistedFEInitPath
-            )
-            .id(persistedFENavId)
-            .frame(minWidth: 700)
+            ResizablePanelContainer(
+              side: .trailing,
+              minWidth: 400,
+              maxWidth: 1200,
+              defaultWidth: 700,
+              userDefaultsKey: AgentHubDefaults.sidePanelWidth
+            ) {
+              FileExplorerView(
+                session: feSession,
+                projectPath: persistedFEProjectPath,
+                onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { sidePanelContent = nil } },
+                isEmbedded: true,
+                initialFilePath: persistedFEInitPath
+              )
+              .id(persistedFENavId)
+            }
           }
         }
         .animation(.easeInOut(duration: 0.25), value: sidePanelContent != nil)

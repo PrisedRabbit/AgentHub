@@ -76,9 +76,15 @@ public struct FileExplorerView: View {
       } else {
         HStack(spacing: 0) {
           if showSidebar {
-            fileTreeSidebar
-              .frame(width: 240)
-            Divider()
+            ResizablePanelContainer(
+              side: .leading,
+              minWidth: 160,
+              maxWidth: 480,
+              defaultWidth: 240,
+              userDefaultsKey: AgentHubDefaults.fileExplorerSidebarWidth
+            ) {
+              fileTreeSidebar
+            }
           }
           VStack(spacing: 0) {
             contentAreaHeader

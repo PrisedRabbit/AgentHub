@@ -30,19 +30,25 @@ public actor FileIndexService {
   ]
 
   /// Hidden files/dirs (starting with `.`) that are still useful to index.
-  /// Note: .env* files are intentionally excluded to avoid indexing secrets.
+  /// Keep this list intentionally narrow to avoid surfacing secret-bearing dotfiles.
   private static let allowedHiddenNames: Set<String> = [
     ".gitignore", ".gitmodules", ".gitattributes",
     ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml",
     ".prettierrc", ".prettierrc.js", ".prettierrc.json", ".prettierrc.yml",
     ".swiftlint.yml", ".swiftformat",
     ".editorconfig", ".nvmrc", ".node-version", ".ruby-version", ".python-version",
-    ".npmrc", ".yarnrc", ".yarnrc.yml",
     ".babelrc", ".babelrc.json",
     ".dockerignore", ".docker",
-    ".github", ".vscode", ".cursor",
-    ".claude", ".clauderc"
+    ".github", ".vscode", ".cursor"
   ]
+
+  private struct IgnoreRule {
+    let basePath: String
+    let pattern: String
+    let isNegated: Bool
+    let directoryOnly: Bool
+    let matchesRelativePath: Bool
+  }
 
   // MARK: - Cache
 
@@ -73,12 +79,11 @@ public actor FileIndexService {
   /// Returns recently opened files that belong to `projectPath`, as `FileSearchResult` objects.
   public func recentFiles(in projectPath: String) -> [FileSearchResult] {
     recentPaths
-      .filter { $0.hasPrefix(projectPath + "/") || $0.hasPrefix(projectPath) }
-      .map { path in
+      .compactMap { path in
+        guard let relativePath = Self.relativePathIfContained(path, within: projectPath) else {
+          return nil
+        }
         let name = URL(fileURLWithPath: path).lastPathComponent
-        let relativePath = path.hasPrefix(projectPath + "/")
-          ? String(path.dropFirst(projectPath.count + 1))
-          : name
         return FileSearchResult(
           id: path,
           name: name,
@@ -158,33 +163,45 @@ public actor FileIndexService {
   /// Reads a file at `path` as a UTF-8 string.
   /// `projectPath` is required so the read is validated to stay within the project root.
   public func readFile(at path: String, projectPath: String) throws -> String {
-    try validatePath(path, within: projectPath)
-    return try String(contentsOfFile: path, encoding: .utf8)
+    let validatedURL = try validatePath(path, within: projectPath, forWrite: false)
+    return try String(contentsOf: validatedURL, encoding: .utf8)
   }
 
   /// Writes `content` to the file at `path` atomically, then invalidates any matching project cache.
   /// `projectPath` is required so the write is validated to stay within the project root.
   public func writeFile(at path: String, content: String, projectPath: String) throws {
-    try validatePath(path, within: projectPath)
-    let url = URL(fileURLWithPath: path)
-    try content.write(to: url, atomically: true, encoding: .utf8)
+    let validatedURL = try validatePath(path, within: projectPath, forWrite: true)
+    try content.write(to: validatedURL, atomically: true, encoding: .utf8)
     // Invalidate the cache for any project whose path is a prefix of the written file
-    for key in cache.keys where path.hasPrefix(key) {
+    for key in cache.keys where Self.isPath(validatedURL.path, within: key) {
       cache.removeValue(forKey: key)
     }
   }
 
   // MARK: - Path Validation
 
-  /// Throws if `path` (after canonicalization) does not reside inside `projectRoot`.
-  private func validatePath(_ path: String, within projectRoot: String) throws {
-    let canonicalPath = URL(fileURLWithPath: path).standardizedFileURL.path
-    let canonicalRoot = URL(fileURLWithPath: projectRoot).standardizedFileURL.path
-    guard canonicalPath.hasPrefix(canonicalRoot + "/") || canonicalPath == canonicalRoot else {
+  /// Throws if `path` does not reside inside `projectRoot` after resolving symlinks.
+  private func validatePath(_ path: String, within projectRoot: String, forWrite: Bool) throws -> URL {
+    let resolvedRootURL = Self.resolvedURL(for: projectRoot)
+    let candidateURL = URL(fileURLWithPath: path).standardizedFileURL
+
+    let resolvedCandidateURL: URL
+    if forWrite {
+      let resolvedParentURL = Self.resolvedURL(for: candidateURL.deletingLastPathComponent().path)
+      resolvedCandidateURL = resolvedParentURL
+        .appendingPathComponent(candidateURL.lastPathComponent)
+        .standardizedFileURL
+    } else {
+      resolvedCandidateURL = Self.resolvedURL(for: candidateURL.path)
+    }
+
+    guard Self.isPath(resolvedCandidateURL.path, within: resolvedRootURL.path) else {
       throw CocoaError(.fileReadNoPermission, userInfo: [
         NSLocalizedDescriptionKey: "Access denied: path is outside the project directory."
       ])
     }
+
+    return resolvedCandidateURL
   }
 
   // MARK: - Cache Helpers
@@ -197,9 +214,9 @@ public actor FileIndexService {
 
   private func scanDirectory(at path: String) async -> [FileTreeNode] {
     await Task.detached(priority: .utility) {
-      let rootPatterns = FileIndexService.parseGitignore(at: path)
+      let rootPatterns = FileIndexService.parseGitignore(at: path, relativeTo: path)
       return FileIndexService.scanDirectorySync(
-        at: path, relativeTo: path, depth: 0, inheritedPatterns: rootPatterns
+        at: path, relativeTo: path, depth: 0, inheritedRules: rootPatterns
       )
     }.value
   }
@@ -208,7 +225,7 @@ public actor FileIndexService {
     at path: String,
     relativeTo rootPath: String,
     depth: Int,
-    inheritedPatterns: [String]
+    inheritedRules: [IgnoreRule]
   ) -> [FileTreeNode] {
     guard depth < maxDepth else { return [] }
 
@@ -218,9 +235,9 @@ public actor FileIndexService {
       return []
     }
 
-    // Merge inherited patterns with this directory's own .gitignore
-    let localPatterns = depth == 0 ? [] : parseGitignore(at: path)
-    let allPatterns = inheritedPatterns + localPatterns
+    // Merge inherited rules with this directory's own .gitignore rules.
+    let localRules = depth == 0 ? [] : parseGitignore(at: path, relativeTo: rootPath)
+    let allRules = inheritedRules + localRules
 
     var nodes: [FileTreeNode] = []
 
@@ -230,10 +247,7 @@ public actor FileIndexService {
 
       // Hidden file filtering
       if name.hasPrefix(".") {
-        let allowed = allowedHiddenNames.contains(name)
-          || name.hasSuffix(".yaml")
-          || name.hasSuffix(".json")
-        if !allowed { continue }
+        guard allowedHiddenNames.contains(name) else { continue }
       }
 
       let fullPath = (path as NSString).appendingPathComponent(name)
@@ -248,17 +262,17 @@ public actor FileIndexService {
       }
 
       // Gitignore check
-      if isIgnored(name: name, relativePath: relativePath, patterns: allPatterns) {
+      var isDirectory: ObjCBool = false
+      fm.fileExists(atPath: fullPath, isDirectory: &isDirectory)
+
+      if isIgnored(relativePath: relativePath, isDirectory: isDirectory.boolValue, rules: allRules) {
         continue
       }
 
-      var isDir: ObjCBool = false
-      fm.fileExists(atPath: fullPath, isDirectory: &isDir)
-
-      if isDir.boolValue {
+      if isDirectory.boolValue {
         let children = scanDirectorySync(
           at: fullPath, relativeTo: rootPath, depth: depth + 1,
-          inheritedPatterns: allPatterns
+          inheritedRules: allRules
         )
         let node = FileTreeNode(
           id: fullPath,
@@ -292,61 +306,163 @@ public actor FileIndexService {
 
   // MARK: - Gitignore Parsing
 
-  private static func parseGitignore(at directoryPath: String) -> [String] {
+  private static func parseGitignore(at directoryPath: String, relativeTo rootPath: String) -> [IgnoreRule] {
     let gitignorePath = (directoryPath as NSString).appendingPathComponent(".gitignore")
     guard let content = try? String(contentsOfFile: gitignorePath, encoding: .utf8) else {
       return []
     }
+
+    let basePath = projectRelativePath(for: directoryPath, relativeTo: rootPath)
     return content
       .components(separatedBy: .newlines)
-      .filter { !$0.hasPrefix("#") && !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+      .compactMap { parseIgnoreRule($0, basePath: basePath) }
   }
 
-  private static func isIgnored(name: String, relativePath: String, patterns: [String]) -> Bool {
-    for pattern in patterns {
-      var p = pattern
-      // Strip leading slash (anchored to repo root — treat as simple name match here)
-      if p.hasPrefix("/") { p = String(p.dropFirst()) }
-      if matchesPattern(p, name: name, relativePath: relativePath) {
+  private static func parseIgnoreRule(_ rawLine: String, basePath: String) -> IgnoreRule? {
+    var line = rawLine.trimmingCharacters(in: .whitespaces)
+    guard !line.isEmpty, !line.hasPrefix("#") else { return nil }
+
+    var isNegated = false
+    if line.hasPrefix("!") {
+      isNegated = true
+      line.removeFirst()
+    }
+
+    guard !line.isEmpty else { return nil }
+
+    let isAnchored = line.hasPrefix("/")
+    if isAnchored {
+      line.removeFirst()
+    }
+
+    let directoryOnly = line.hasSuffix("/")
+    if directoryOnly {
+      line.removeLast()
+    }
+
+    guard !line.isEmpty else { return nil }
+
+    return IgnoreRule(
+      basePath: basePath,
+      pattern: line,
+      isNegated: isNegated,
+      directoryOnly: directoryOnly,
+      matchesRelativePath: isAnchored || line.contains("/")
+    )
+  }
+
+  private static func isIgnored(relativePath: String, isDirectory: Bool, rules: [IgnoreRule]) -> Bool {
+    var ignored = false
+
+    for rule in rules {
+      if matchesRule(rule, relativePath: relativePath, isDirectory: isDirectory) {
+        ignored = !rule.isNegated
+      }
+    }
+
+    return ignored
+  }
+
+  private static func matchesRule(_ rule: IgnoreRule, relativePath: String, isDirectory: Bool) -> Bool {
+    guard let scopedPath = applyBasePath(rule.basePath, to: relativePath), !scopedPath.isEmpty else {
+      return false
+    }
+
+    if rule.matchesRelativePath {
+      if rule.directoryOnly {
+        return scopedPath == rule.pattern || scopedPath.hasPrefix(rule.pattern + "/")
+      }
+
+      return globMatch(pattern: rule.pattern, string: scopedPath)
+    }
+
+    let components = scopedPath.split(separator: "/")
+    for (index, component) in components.enumerated() {
+      guard globMatch(pattern: rule.pattern, string: String(component)) else { continue }
+
+      if !rule.directoryOnly {
+        return true
+      }
+
+      let isLastComponent = index == components.count - 1
+      if !isLastComponent || isDirectory {
         return true
       }
     }
+
     return false
   }
 
-  /// Simple glob matching supporting `*` wildcard.
-  private static func matchesPattern(_ pattern: String, name: String, relativePath: String) -> Bool {
-    // If pattern contains `/`, match against relative path; otherwise against name only
-    let target = pattern.contains("/") ? relativePath : name
-    return globMatch(pattern: pattern, string: target)
+  private static func applyBasePath(_ basePath: String, to relativePath: String) -> String? {
+    guard !basePath.isEmpty else { return relativePath }
+    guard relativePath.hasPrefix(basePath + "/") else { return nil }
+    return String(relativePath.dropFirst(basePath.count + 1))
   }
 
-  /// Lightweight glob match: supports `*` as a wildcard matching any sequence of non-slash chars.
+  /// Lightweight glob match for gitignore-style matching.
+  /// Supports `*`, `**`, and `?`, with `*` not crossing path separators.
   private static func globMatch(pattern: String, string: String) -> Bool {
-    var p = pattern[pattern.startIndex...]
-    var s = string[string.startIndex...]
+    let regexMetaCharacters = CharacterSet(charactersIn: "\\.^$+()[]{}|")
+    var regex = "^"
+    var index = pattern.startIndex
 
-    while !p.isEmpty {
-      if p.first == "*" {
-        p = p.dropFirst()
-        if p.isEmpty { return true }
-        // Try matching the remainder from every position in s
-        while !s.isEmpty {
-          if globMatch(pattern: String(p), string: String(s)) { return true }
-          s = s.dropFirst()
+    while index < pattern.endIndex {
+      let character = pattern[index]
+
+      if character == "*" {
+        let nextIndex = pattern.index(after: index)
+        if nextIndex < pattern.endIndex, pattern[nextIndex] == "*" {
+          regex += ".*"
+          index = pattern.index(after: nextIndex)
+        } else {
+          regex += "[^/]*"
+          index = nextIndex
         }
-        return false
-      } else if s.isEmpty {
-        return false
-      } else if p.first == s.first {
-        p = p.dropFirst()
-        s = s.dropFirst()
-      } else {
-        return false
+        continue
       }
+
+      if character == "?" {
+        regex += "[^/]"
+        index = pattern.index(after: index)
+        continue
+      }
+
+      if String(character).rangeOfCharacter(from: regexMetaCharacters) != nil {
+        regex += "\\"
+      }
+
+      regex.append(character)
+      index = pattern.index(after: index)
     }
 
-    return s.isEmpty
+    regex += "$"
+    return string.range(of: regex, options: .regularExpression) != nil
+  }
+
+  private static func projectRelativePath(for path: String, relativeTo rootPath: String) -> String {
+    let standardizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
+    let standardizedRoot = URL(fileURLWithPath: rootPath).standardizedFileURL.path
+    guard standardizedPath != standardizedRoot else { return "" }
+    guard standardizedPath.hasPrefix(standardizedRoot + "/") else { return "" }
+    return String(standardizedPath.dropFirst(standardizedRoot.count + 1))
+  }
+
+  private static func resolvedURL(for path: String) -> URL {
+    URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+  }
+
+  private static func isPath(_ path: String, within rootPath: String) -> Bool {
+    path == rootPath || path.hasPrefix(rootPath + "/")
+  }
+
+  private static func relativePathIfContained(_ path: String, within projectPath: String) -> String? {
+    let resolvedRootPath = resolvedURL(for: projectPath).path
+    let resolvedPath = resolvedURL(for: path).path
+    guard isPath(resolvedPath, within: resolvedRootPath), resolvedPath != resolvedRootPath else {
+      return nil
+    }
+
+    return String(resolvedPath.dropFirst(resolvedRootPath.count + 1))
   }
 
   // MARK: - Search Helpers

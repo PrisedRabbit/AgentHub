@@ -176,13 +176,13 @@ struct ResizableCardContainer<Content: View>: View {
   }
 }
 
-private func resizableDividerColor(isDragging: Bool, isHovering: Bool) -> Color {
+func resizableDividerColor(isDragging: Bool, isHovering: Bool) -> Color {
   if isHovering {
     return Color.primary.opacity(0.28)
   }
   return Color.primary.opacity(isDragging ? 0.14 : 0.09)
 }
 
-private func resizableDividerThickness(isDragging: Bool, isHovering: Bool) -> CGFloat {
+func resizableDividerThickness(isDragging: Bool, isHovering: Bool) -> CGFloat {
   return isHovering || isDragging ? 2 : 1
 }
