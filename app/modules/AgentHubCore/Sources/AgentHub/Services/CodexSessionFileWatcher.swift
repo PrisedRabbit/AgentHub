@@ -219,7 +219,8 @@ public actor CodexSessionFileWatcher {
       gitBranch: nil,
       pendingToolUse: nil,
       recentActivities: result.recentActivities,
-      hasMermaidContent: result.hasMermaidContent
+      hasMermaidContent: result.hasMermaidContent,
+      detectedResourceLinks: result.detectedResourceLinks
     )
   }
 }

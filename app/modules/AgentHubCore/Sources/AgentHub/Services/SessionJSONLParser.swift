@@ -85,6 +85,7 @@ public struct SessionJSONLParser {
     public var currentStatus: SessionStatus = .idle
     public var gitBranch: String?
     public var hasMermaidContent: Bool = false
+    public var detectedResourceLinks: [ResourceLink] = []
 
     public init() {}
   }
@@ -286,8 +287,16 @@ public struct SessionJSONLParser {
         )
 
       case "text":
-        if let text = block.text, text.contains("```mermaid") {
-          result.hasMermaidContent = true
+        if let text = block.text {
+          if text.contains("```mermaid") {
+            result.hasMermaidContent = true
+          }
+          let links = extractResourceLinks(from: text, timestamp: timestamp)
+          for link in links {
+            if !result.detectedResourceLinks.contains(where: { $0.url == link.url }) {
+              result.detectedResourceLinks.append(link)
+            }
+          }
         }
         addActivity(
           type: .assistantMessage,
@@ -482,6 +491,30 @@ public struct SessionJSONLParser {
     }
 
     return nil
+  }
+
+  /// Extract URLs from text content and return as ResourceLink instances
+  private static func extractResourceLinks(from text: String, timestamp: Date?) -> [ResourceLink] {
+    // Match http:// and https:// URLs
+    guard let regex = try? NSRegularExpression(
+      pattern: "https?://[^\\s)\\]>\"'`]+",
+      options: []
+    ) else { return [] }
+
+    let range = NSRange(text.startIndex..., in: text)
+    let matches = regex.matches(in: text, options: [], range: range)
+
+    var links: [ResourceLink] = []
+    for match in matches {
+      guard let matchRange = Range(match.range, in: text) else { continue }
+      var urlString = String(text[matchRange])
+      // Strip trailing punctuation that's likely not part of the URL
+      while let last = urlString.last, [".", ",", ";", ":"].contains(String(last)) {
+        urlString.removeLast()
+      }
+      links.append(ResourceLink(url: urlString, timestamp: timestamp ?? Date()))
+    }
+    return links
   }
 
   private static func isErrorResult(_ content: AnyCodable?) -> Bool {

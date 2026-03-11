@@ -358,7 +358,8 @@ public actor SessionFileWatcher {
       gitBranch: result.gitBranch,
       pendingToolUse: pendingToolUse,
       recentActivities: result.recentActivities,
-      hasMermaidContent: result.hasMermaidContent
+      hasMermaidContent: result.hasMermaidContent,
+      detectedResourceLinks: result.detectedResourceLinks
     )
   }
 
