@@ -30,8 +30,8 @@ public actor FileIndexService {
   ]
 
   /// Hidden files/dirs (starting with `.`) that are still useful to index.
+  /// Note: .env* files are intentionally excluded to avoid indexing secrets.
   private static let allowedHiddenNames: Set<String> = [
-    ".env", ".env.local", ".env.development", ".env.production", ".env.example",
     ".gitignore", ".gitmodules", ".gitattributes",
     ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml",
     ".prettierrc", ".prettierrc.js", ".prettierrc.json", ".prettierrc.yml",
@@ -41,8 +41,7 @@ public actor FileIndexService {
     ".babelrc", ".babelrc.json",
     ".dockerignore", ".docker",
     ".github", ".vscode", ".cursor",
-    ".claude", ".clauderc",
-    ".env.test", ".env.staging"
+    ".claude", ".clauderc"
   ]
 
   // MARK: - Cache
@@ -106,7 +105,7 @@ public actor FileIndexService {
   /// 3. Path contains query as substring → medium score
   /// All matching is case-insensitive substring, no fuzzy.
   public func search(query: String, in projectPath: String) async -> [FileSearchResult] {
-    guard !query.isEmpty else { return [] }
+    guard !query.isEmpty, query.count < 200 else { return [] }
     let nodes = await index(projectPath: projectPath)
     let allFiles = flattenFiles(nodes, projectPath: projectPath)
     let q = query.lowercased()
@@ -127,13 +126,13 @@ public actor FileIndexService {
       } else if nameLower.hasPrefix(q) {
         // Filename starts with query (with extension)
         score = 3500 + (100 - min(nameLower.count, 100))
-      } else if nameLower.contains(q) {
+      } else if nameLower.contains(q), let nameRange = nameLower.range(of: q) {
         // Filename contains query
-        let pos = nameLower.range(of: q)!.lowerBound.utf16Offset(in: nameLower)
+        let pos = nameRange.lowerBound.utf16Offset(in: nameLower)
         score = 2000 + (200 - pos) + (100 - min(nameLower.count, 100))
-      } else if pathLower.contains(q) {
+      } else if pathLower.contains(q), let pathRange = pathLower.range(of: q) {
         // Path contains query
-        let pos = pathLower.range(of: q)!.lowerBound.utf16Offset(in: pathLower)
+        let pos = pathRange.lowerBound.utf16Offset(in: pathLower)
         score = 1000 + (500 - min(pos, 500))
       }
 
@@ -157,17 +156,34 @@ public actor FileIndexService {
   }
 
   /// Reads a file at `path` as a UTF-8 string.
-  public func readFile(at path: String) throws -> String {
-    try String(contentsOfFile: path, encoding: .utf8)
+  /// `projectPath` is required so the read is validated to stay within the project root.
+  public func readFile(at path: String, projectPath: String) throws -> String {
+    try validatePath(path, within: projectPath)
+    return try String(contentsOfFile: path, encoding: .utf8)
   }
 
   /// Writes `content` to the file at `path` atomically, then invalidates any matching project cache.
-  public func writeFile(at path: String, content: String) throws {
+  /// `projectPath` is required so the write is validated to stay within the project root.
+  public func writeFile(at path: String, content: String, projectPath: String) throws {
+    try validatePath(path, within: projectPath)
     let url = URL(fileURLWithPath: path)
     try content.write(to: url, atomically: true, encoding: .utf8)
     // Invalidate the cache for any project whose path is a prefix of the written file
     for key in cache.keys where path.hasPrefix(key) {
       cache.removeValue(forKey: key)
+    }
+  }
+
+  // MARK: - Path Validation
+
+  /// Throws if `path` (after canonicalization) does not reside inside `projectRoot`.
+  private func validatePath(_ path: String, within projectRoot: String) throws {
+    let canonicalPath = URL(fileURLWithPath: path).standardizedFileURL.path
+    let canonicalRoot = URL(fileURLWithPath: projectRoot).standardizedFileURL.path
+    guard canonicalPath.hasPrefix(canonicalRoot + "/") || canonicalPath == canonicalRoot else {
+      throw CocoaError(.fileReadNoPermission, userInfo: [
+        NSLocalizedDescriptionKey: "Access denied: path is outside the project directory."
+      ])
     }
   }
 
@@ -224,6 +240,12 @@ public actor FileIndexService {
       let relativePath = fullPath.hasPrefix(rootPath + "/")
         ? String(fullPath.dropFirst(rootPath.count + 1))
         : name
+
+      // Skip symlinks to prevent traversal outside the project root
+      if let attrs = try? fm.attributesOfItem(atPath: fullPath),
+         attrs[.type] as? FileAttributeType == .typeSymbolicLink {
+        continue
+      }
 
       // Gitignore check
       if isIgnored(name: name, relativePath: relativePath, patterns: allPatterns) {
