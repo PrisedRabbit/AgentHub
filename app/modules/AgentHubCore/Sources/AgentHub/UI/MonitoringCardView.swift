@@ -225,6 +225,11 @@ public struct MonitoringCardView: View {
       monitorContent
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+
+      // Resource links panel (shown when URLs are detected in session responses)
+      if let links = state?.detectedResourceLinks, !links.isEmpty {
+        ResourceLinksPanel(links: links, providerKind: providerKind)
+      }
     }
     .background(colorScheme == .dark ? Color(white: 0.07) : Color(white: 0.92))
     .clipShape(RoundedRectangle(cornerRadius: 8))

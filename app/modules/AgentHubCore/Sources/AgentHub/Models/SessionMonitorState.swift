@@ -40,6 +40,9 @@ public struct SessionMonitorState: Equatable, Sendable {
   // Mermaid diagram detection
   public var hasMermaidContent: Bool
 
+  // Resource links detected in session responses
+  public var detectedResourceLinks: [ResourceLink]
+
   public init(
     status: SessionStatus = .idle,
     currentTool: String? = nil,
@@ -56,7 +59,8 @@ public struct SessionMonitorState: Equatable, Sendable {
     gitBranch: String? = nil,
     pendingToolUse: PendingToolUse? = nil,
     recentActivities: [ActivityEntry] = [],
-    hasMermaidContent: Bool = false
+    hasMermaidContent: Bool = false,
+    detectedResourceLinks: [ResourceLink] = []
   ) {
     self.status = status
     self.currentTool = currentTool
@@ -74,6 +78,7 @@ public struct SessionMonitorState: Equatable, Sendable {
     self.pendingToolUse = pendingToolUse
     self.recentActivities = recentActivities
     self.hasMermaidContent = hasMermaidContent
+    self.detectedResourceLinks = detectedResourceLinks
   }
 
   // MARK: - Computed Properties
@@ -469,7 +474,9 @@ public struct CostCalculator {
     )
   }
 
-  private static func getPrices(for model: String?) -> (input: Decimal, output: Decimal, cacheRead: Decimal, cacheCreation: Decimal) {
+  private static func getPrices(
+    for model: String?
+  ) -> (input: Decimal, output: Decimal, cacheRead: Decimal, cacheCreation: Decimal) {
     guard let model = model?.lowercased() else {
       // Default to Opus pricing
       return (opusInputPrice, opusOutputPrice, opusCacheReadPrice, opusCacheCreationPrice)
@@ -485,5 +492,48 @@ public struct CostCalculator {
       // Default to Opus pricing for unknown models
       return (opusInputPrice, opusOutputPrice, opusCacheReadPrice, opusCacheCreationPrice)
     }
+  }
+}
+
+// MARK: - ResourceLink
+
+/// A URL resource detected in session assistant responses
+public struct ResourceLink: Identifiable, Equatable, Sendable, Hashable {
+  public let id: UUID
+  public let url: String
+  public let timestamp: Date
+
+  public init(
+    id: UUID = UUID(),
+    url: String,
+    timestamp: Date = Date()
+  ) {
+    self.id = id
+    self.url = url
+    self.timestamp = timestamp
+  }
+
+  /// Extract display-friendly domain from the URL
+  public var displayDomain: String {
+    guard let urlObj = URL(string: url),
+          let host = urlObj.host else {
+      return url
+    }
+    return host
+  }
+
+  /// Extract a short display title from the URL path
+  public var displayTitle: String {
+    guard let urlObj = URL(string: url) else { return url }
+    let path = urlObj.path
+    if path.isEmpty || path == "/" {
+      return displayDomain
+    }
+    // Use last meaningful path component
+    let components = path.split(separator: "/").filter { !$0.isEmpty }
+    if let last = components.last {
+      return String(last)
+    }
+    return displayDomain
   }
 }

@@ -41,6 +41,7 @@ public struct CodexSessionJSONLParser {
     public var sessionStartedAt: Date?
     public var currentStatus: SessionStatus = .idle
     public var hasMermaidContent: Bool = false
+    public var detectedResourceLinks: [ResourceLink] = []
 
     public init() {}
   }
@@ -198,6 +199,12 @@ public struct CodexSessionJSONLParser {
       result.messageCount += 1
       if let message = payload["message"] as? String, !message.isEmpty {
         if message.contains("```mermaid") { result.hasMermaidContent = true }
+        let links = extractResourceLinks(from: message, timestamp: timestamp)
+        for link in links {
+          if !result.detectedResourceLinks.contains(where: { $0.url == link.url }) {
+            result.detectedResourceLinks.append(link)
+          }
+        }
         addActivity(type: .assistantMessage, description: String(message.prefix(80)), timestamp: timestamp, to: &result)
       }
 
@@ -313,6 +320,27 @@ public struct CodexSessionJSONLParser {
     if result.recentActivities.count > 100 {
       result.recentActivities.removeFirst(result.recentActivities.count - 100)
     }
+  }
+
+  private static func extractResourceLinks(from text: String, timestamp: Date?) -> [ResourceLink] {
+    guard let regex = try? NSRegularExpression(
+      pattern: "https?://[^\\s)\\]>\"'`]+",
+      options: []
+    ) else { return [] }
+
+    let range = NSRange(text.startIndex..., in: text)
+    let matches = regex.matches(in: text, options: [], range: range)
+
+    var links: [ResourceLink] = []
+    for match in matches {
+      guard let matchRange = Range(match.range, in: text) else { continue }
+      var urlString = String(text[matchRange])
+      while let last = urlString.last, [".", ",", ";", ":"].contains(String(last)) {
+        urlString.removeLast()
+      }
+      links.append(ResourceLink(url: urlString, timestamp: timestamp ?? Date()))
+    }
+    return links
   }
 
   private static func parseTimestamp(_ string: String?) -> Date? {
