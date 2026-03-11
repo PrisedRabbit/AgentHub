@@ -77,15 +77,9 @@ public struct FileExplorerView: View {
       } else {
         HStack(spacing: 0) {
           if showSidebar {
-            ResizablePanelContainer(
-              side: .leading,
-              minWidth: 160,
-              maxWidth: 480,
-              defaultWidth: 240,
-              userDefaultsKey: AgentHubDefaults.fileExplorerSidebarWidth
-            ) {
-              fileTreeSidebar
-            }
+            fileTreeSidebar
+              .frame(width: 240)
+            Divider()
           }
           VStack(spacing: 0) {
             contentAreaHeader
@@ -244,7 +238,7 @@ public struct FileExplorerView: View {
 
       ScrollViewReader { proxy in
         ScrollView([.vertical, .horizontal]) {
-          LazyVStack(alignment: .leading, spacing: 0) {
+          VStack(alignment: .leading, spacing: 0) {
             ForEach(treeNodes) { node in
               FileTreeNodeView(
                 node: node,
